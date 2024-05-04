@@ -3,3 +3,6 @@ test.ipynb
 1.png
 *.pyc
 .vscode/settings.json
+dist/
+build/
+autocook.spec

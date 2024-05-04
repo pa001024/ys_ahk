@@ -510,7 +510,7 @@ class GameControl:
 def main_loop():
     hwnd = wg.FindWindow(None, "原神")
     if hwnd == 0:
-        console.log("[red]未找到原神窗口 退出")
+        console.log("[red]未找到原神窗口 请把游戏窗口分辨率调整到1600X900后运行本程序")
         raise SystemExit()
     wg.SetForegroundWindow(hwnd)
     time.sleep(0.1)
