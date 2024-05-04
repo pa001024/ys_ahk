@@ -1,7 +1,7 @@
+# 使用前请输入以下命令安装依赖库 pip install ddddocr cnocr pillow rich flask numpy opencv-python
 from flask import Flask, request
 import ddddocr
 import re
-import pyperclip
 import cv2
 from cnocr import CnOcr
 from PIL import ImageGrab
@@ -10,7 +10,7 @@ import numpy as np
 
 console = Console()
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="", static_folder=".")
 ocr = ddddocr.DdddOcr(show_ad=False)
 numocr = CnOcr(det_model_name="naive_det", rec_model_name="en_PP-OCRv3")
 cnocr = CnOcr()
@@ -19,10 +19,14 @@ cnocr = CnOcr()
 uid_list: list[str] = []
 
 
+def cors_response(res):
+    return app.response_class(response=res, status=200, mimetype="text/plain", headers={"Access-Control-Allow-Origin": "*"})
+
+
 # 获取UID列表
 @app.route("/list", methods=["GET"])
 def get_uid_list():
-    return uid_list
+    return cors_response(",".join(uid_list))
 
 
 # 添加UID
@@ -36,7 +40,7 @@ def add_uid(uid):
 @app.route("/del/<uid>", methods=["GET"])
 def del_uid(uid):
     uid_list.remove(uid)
-    return ",".join(uid_list)
+    return cors_response(",".join(uid_list))
 
 
 # 文字识别
@@ -54,10 +58,10 @@ def ocr_text():
     img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
     rst = cnocr.ocr_for_single_line(img)
+    if rst.get("score", 0) < 0.8:
+        return ""
     text = rst.get("text", "")
     console.log(text)
-    # 设置剪贴板
-    pyperclip.copy(text)
     return text
 
 
@@ -69,7 +73,8 @@ def ocr_uid():
     y = request.args.get("y", type=int)
     w = request.args.get("w", type=int)
     h = request.args.get("h", type=int)
-
+    if x is None or y is None or w is None or h is None:
+        return "参数错误"
     # 截取指定区域的屏幕
     bbox = (x, y, x + w, y + h)
     img = ImageGrab.grab(bbox)
@@ -80,12 +85,16 @@ def ocr_uid():
     # 提取识别结果
     if len(text) != 9:
         img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        text = str_filter(numocr.ocr_for_single_line(img))
+        rst = numocr.ocr_for_single_line(img)
+        text = str_filter(rst.get("text", ""))
     console.log(text)
-    # 设置剪贴板
-    pyperclip.copy(text)
-
     return text
+
+
+# handle index.html
+@app.route("/", methods=["GET"])
+def index():
+    return app.send_static_file("index.html")
 
 
 # 过滤字符串
@@ -98,4 +107,4 @@ def str_filter(text):
 
 
 if __name__ == "__main__":
-    app.run(host="localhost", port=8888)
+    app.run(host="0.0.0.0", port=8888, debug=False)

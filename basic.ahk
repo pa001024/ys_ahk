@@ -1,6 +1,7 @@
 #Requires AutoHotkey v2.0
 #Include lib.ahk
 
+CapsLock & r:: Reload()
 ; 鼠标连点
 CapsLock & x:: {
     ; BlockInput On

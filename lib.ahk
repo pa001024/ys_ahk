@@ -23,6 +23,32 @@ CheckColor(x, y, v) {
   return RegExMatch(SubStr(color, 3, 6), v) == 1
 }
 
+WaitColor(x, y, v, timeout := 1000, interval := 100) {
+  s := A_TickCount
+  Loop {
+    if CheckColor(x, y, v)
+      return true
+    else
+      Sleep interval
+    if timeout > 0 and A_TickCount - s > timeout
+      return false
+  }
+}
+
+SendAndWaitColor(x, y, v, key, timeout := 1000, interval := 100) {
+  s := A_TickCount
+  Loop {
+    if CheckColor(x, y, v)
+      return true
+    else {
+      Send key
+      Sleep interval
+    }
+    if timeout > 0 and A_TickCount - s > timeout
+      return false
+  }
+}
+
 endmsg() {
   ToolTip
   SetTimer , 0
@@ -41,6 +67,7 @@ httpRequest(url, method := "GET", headers := "", data := "", userAgent := "Mozil
   req.SetRequestHeader("User-Agent", userAgent)
   req.Send()
   req.WaitForResponse()
+  return req.ResponseText
 }
 
 ;----------------------------------------------------------------------------------------------------------等待动画类 class

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UID</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <h1>自助餐</h1>
+        <div class="input-group">
+            <input type="text" v-model="newUid" placeholder="自动做饭中...">
+            <button @click="addUid">添加</button>
+        </div>
+        <div class="uid-list">
+            <p>当前饭数：{{ uidList.length }} / 3</p>
+            <ul v-if="uidList.length">
+                <li v-for="(uid, index) in uidList" :key="index" @click="copyUid(index)">
+                    <label>{{ uid }}</label>
+                    <button @click.stop="removeUid(index)">拿走</button>
+                </li>
+            </ul>
+            <p v-else>饭吃完了，新饭马上端上来</p>
+        </div>
+        <div class="tip">
+            <p>提示：吃一碗拿一碗，不要浪费。当饭不满3碗时，系统会自动补充。</p>
+        </div>
+    </div>
+</body>
+
+</html>
+<script>
+    const { createApp, ref } = Vue
+
+    const baseURL = location.hostname === 'pa001024.pythonanywhere.com' ? '/' : 'https://pa001024.pythonanywhere.com/'
+    createApp({
+        setup() {
+            const uidList = ref([])
+            const newUid = ref("")
+            const updateUidList = async () => {
+                const response = await fetch(baseURL + 'list')
+                const data = await response.text()
+                uidList.value = data ? data.split(',') : []
+                console.log(uidList.value)
+            }
+            updateUidList()
+            setInterval(updateUidList, 10000)
+
+            const copyText = async (text) => {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text)
+                    return
+                }
+                const input = document.createElement('textarea')
+                input.value = text
+                document.body.appendChild(input)
+                input.focus()
+                input.select()
+                const result = document.execCommand('copy')
+                input.remove()
+                if (!result)
+                    throw new Error('复制失败')
+            }
+            const removeUid = async (index) => {
+                try {
+                    await copyUid(index)
+                } catch (e) {
+                    if (!confirm('复制失败，确认要删除吗？'))
+                        return
+                }
+                const uid = uidList.value.splice(index, 1)
+                fetch(baseURL + 'del/' + uid)
+            }
+            const copyUid = async (index) => {
+                const uid = uidList.value[index]
+                await copyText(uid)
+            }
+
+            const addUid = async () => {
+                if (newUid.value) {
+                    uidList.value.push(newUid.value)
+                    await fetch(baseURL + 'add/' + newUid.value)
+                    newUid.value = ''
+                }
+            }
+            return {
+                uidList, removeUid, copyUid, addUid, newUid
+            }
+        }
+    }).mount('#app')
+</script>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f2f2f2;
+    }
+
+    h1 {
+        text-align: center;
+        margin-top: 50px;
+    }
+
+    .uid-list {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .uid-list p {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+
+    .uid-list ul {
+        margin: 1rem 2rem;
+        padding: 0;
+        list-style: none;
+    }
+
+    .uid-list ul li {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 2px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: white;
+        cursor: pointer;
+
+    }
+
+    .uid-list ul li:last-child {
+        margin-bottom: 0;
+    }
+
+    .uid-list ul li:hover {
+        background-color: #ddd;
+    }
+
+    .uid-list ul li label {
+        font-size: 18px;
+        font-weight: bold;
+        pointer-events: none;
+    }
+
+    .uid-list ul li button {
+        font-size: 18px;
+        padding: 5px 10px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+
+    .input-group {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .input-group input {
+        padding: 10px;
+        font-size: 18px;
+        border: none;
+        border-radius: 2px;
+        margin-right: 10px;
+    }
+
+    .input-group button {
+        padding: 10px 20px;
+        font-size: 18px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+
+    .tip {
+        margin: 20px 30px;
+        text-align: center;
+        font-size: 18px;
+        color: #999;
+    }
+</style>

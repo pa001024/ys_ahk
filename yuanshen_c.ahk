@@ -1,47 +1,165 @@
 #Requires AutoHotkey v2.0
 #Include lib.ahk
+#Include api.ahk
 
-_auto_emo() {
-    Click 756, 838
-    Sleep 500
-    click 478, 654
+_auto_exit() {
+    Send "{F2}"
+    Sleep 600
+    ; if GetColor(1305, 845) == "0xECE5D8"
+    Click 1305, 845
+}
+_auto_msg(txt, auto_exit := true) {
+    WinGetClientPos(&x, &y, &w, &h)
+    loop 5 {
+        if CheckColor(854 * w / 1600, 842 * h / 900, "ECE5D8") {
+            break
+        }
+        Send "{Enter}"
+        Sleep 200
+    }
+    if not CheckColor(642 * w / 1600, 842 * h / 900, "FFFFFF") {
+        Send "{Enter}"
+        Sleep 250
+    }
+    SendText2(txt)
+    Send "{Enter}"
+    Sleep 60
+    if auto_exit {
+        Send "{Escape}"
+        Sleep 140
+    }
+}
+
+_auto_emo(index := 1, auto_exit := false) {
+    WinGetClientPos(&x, &y, &w, &h)
+    SendAndWaitColor(854 * w / 1600, 842 * h / 900, "ECE5D8", "{Enter}", , 200)
+    if CheckColor(770, 838, "ECE5D8") {
+        Click 756, 838
+        Sleep 400
+    }
+    if PixelSearch(&Px, &Py, 311, 394, 391, 713, 0x3B4354) {
+        rx := Mod(index, 5)
+        ry := Floor(index / 5)
+        Click Px + 135 * rx, Py + 166 * ry
+    }
+    if auto_exit {
+        Sleep 100
+        Send "{Escape}"
+        Sleep 150
+    }
+}
+
+global uid_list := []
+_auto_cook_sevice() {
+    global uid_list
+    uid_list := API.GetUIDList()
+
+    while WinActive("ahk_exe YuanShen.exe") {
+        while uid_list.Length < 3 {
+            _auto_cook()
+        }
+        Sleep 3000
+        uid_list := API.GetUIDList()
+        ; loop 3 {
+        ;     if not _auto_check_uid(uid_list[A_Index]) {
+        ;         uid_list := API.DelUID(uid_list[A_Index])
+        ;     }
+        ;     Sleep 1000
+        ; }
+    }
 }
 
 _auto_cook() {
-    while WinActive("ahk_exe YuanShen.exe") {
-        if not CheckColor(303, 50, "96D720") {
-            _auto_f2()
-            Sleep 7000
+    if not CheckColor(305, 50, "9.D720") {
+        _auto_f2()
+        Sleep 8000
+    }
+    if _auto_teleport(1200, true) {
+        WaitColor(305, 50, "9.D720")
+        Sleep 4000
+    } else {
+        Sleep 3000
+        _auto_exit()
+        Sleep 13000
+        return
+    }
+    _auto_msg("你好，可以让我的几个朋友进来打几个怪不~~ ", false)
+    Sleep 1000
+    _auto_emo(1)
+    Sleep 1000
+    if _wait_for_res(30)
+        return
+    ; _auto_emo(9, true)
+    _auto_msg("_(:з」∠)_")
+    Sleep 3000
+    _auto_exit()
+    Sleep 13000
+}
+
+_wait_for_res(secs) {
+    reply := ""
+    flag1 := false
+    flag2 := false
+    flag3 := false
+    loop secs {
+        ; 复活
+        if CheckColor(885, 818, "ECE5D8") {
+            Click 885, 818
+            Sleep 5000
         }
-        _auto_msg("你好！", false)
-        Sleep 1500
-        _auto_msg("可以让我的几个朋友进来打几个怪不~~ ", false)
-        Sleep 4000
-        _auto_msg("就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", false)
-        Sleep 4000
-        _auto_emo()
-        Sleep 1000
-        reply := ""
-        loop 30 {
-            if PixelSearch(&x2, &y2, 345, 400, 503, 759, 0xFFFFFF) {
-                WinGetClientPos(&x, &y, &w, &h)
-                cap_and_ocr_text(x + x2, y + y2 + 40, 120, 30)
-                Sleep 150
-                reply := A_Clipboard
+        startPos := 204
+        WinGetClientPos(&x, &y, &w, &h)
+        while startPos < 730 {
+            ; 查找第一个白色像素点的y坐标
+            if not PixelSearch(&x2, &y2, 345, startPos, 351, 759, 0xFFFFFF, 3)
                 break
+            reply := API.OCRText(x + 357, y + y2 + 42, 158, 32)
+            if reply != "" {
+                if RegExMatch(reply, "^进|冲冲冲|请便|good|欧克|阔以|^打呗?吧?$|^来|可以|^可|^行|彳亍|[Oo][Kk]|^好|^哦|^嗯|^1|^hao|一起|随便|随意|^去|自便|自取|没问题|当然|欢迎") {
+                    _auto_msg("好的，我先走啦，一会就来~~ 谢谢~~")
+                    Sleep 1000
+                    global uid_list
+                    uid := _copy_uid(true)
+                    uid_list := API.AddUID(uid)
+                    _auto_exit()
+                    Sleep 15000
+                    return true
+                } else if RegExMatch(reply, "^不|shg|珊瑚宫|锄地|留着") {
+                    _auto_msg("打扰了！")
+                    _auto_exit()
+                    Sleep 15000
+                    return true
+                }
+                ; 自动回复
+                if RegExMatch(reply, "干什么|为什么|干嘛|干吗") {
+                    if not flag1 {
+                        _auto_msg("这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~", false)
+                        flag1 := true
+                        Sleep 1000
+                    }
+                } else if RegExMatch(reply, "什么|啥|\\?|哪个|那个") {
+                    if not flag2 {
+                        Sleep 2000
+                        _auto_msg("就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", false)
+                        flag2 := true
+                        Sleep 1000
+                        secs := 45
+                    }
+                } else if RegExMatch(reply, "帮我|帮忙|^帮") {
+                    if not flag3 {
+                        Sleep 2000
+                        _auto_msg("要帮忙的话可以让他们帮哦，我只是来问一下一会就走了~~", false)
+                        flag3 := true
+                        Sleep 1000
+                    }
+                }
             }
-            Sleep 1000
+            startPos := y2 + 119
         }
-        if RegExMatch(reply, "可以|^行|OK|^好|哦|嗯") {
-            _auto_msg("我先走啦 可以的话一会就同意一下~~ 谢谢啦~~")
-            Sleep 1000
-        } else {
-            _auto_msg("不好意思打扰啦！")
-            _auto_exit()
-            Sleep 15000
-            continue
-        }
-        if not CheckColor(303, 50, "96D720") {
+        if CheckColor(30, 46, "ECE5D8") {
+            ; Send "{Escape}"
+            ; Sleep 500
+        } else if not CheckColor(303, 50, "96D720") {
             while CheckColor(300, 300, "1C1C22") or CheckColor(300, 300, "FFFFFF") {
                 Sleep 1000
                 if A_Index > 30 {
@@ -49,97 +167,141 @@ _auto_cook() {
                 }
             }
             Sleep 12000
-            continue
+            return true
         }
-        _copy_uid(true)
-        if A_Clipboard == "111111111" {
-            Click 50, 50
-            Sleep 150
-            _copy_uid(true)
-        }
-        _auto_exit()
-        if sendtopu(reply)
-            last_update_local := A_TickCount
-        Sleep 13000
-        global last_update
-        while A_TickCount - last_update < 60000 { ; 1分延迟
-            Sleep 1000
-        }
-        OutputDebug A_TickCount
-        last_update := last_update_local
+        Sleep 1000
     }
+    return false
 }
 
-_f3() {
-    ; 切区域
+_auto_check_uid(uid := A_Clipboard) {
+    A_Clipboard := uid
     WinGetClientPos(&x, &y, &w, &h)
-    Send "m"
-    Sleep 750
-    Click 1580 * w / 1600, 846 * h / 900 ; 地图
-    Sleep 200
-    Click 1272 * w / 1600, 327 * h / 900 ; 枫丹
-    Sleep 450
+    if not CheckColor(380 * w / 1600, 844 * h / 900, "ECE5D8") {
+        Send "{F2}"
+        Sleep 800
+    }
+    if not CheckColor(1218 * w / 1600, 90 * h / 900, "FFFFFF") {
+        Click 1242 * w / 1600, 103 * h / 900
+        Sleep 200
+    }
+    Click 1242 * w / 1600, 103 * h / 900
+    Sleep 60
+    Click 1403 * w / 1600, 101 * h / 900
+    Sleep 100
+
+    return not CheckColor(257 * w / 1600, 295 * h / 900, "D.D.C.")
+}
+
+_auto_teleport(delay := 800, checkonly := false) {
+    WinGetClientPos(&x, &y, &w, &h)
+    ; 切区域
+    _reset_map(delay)
+
+    if not WaitColor(1535, 25, "ECE5D8") {
+        return false
+    }
     ; 调缩放
     if PixelSearch(&Px, &Py, 37, 365, 36, 534, 0xEDE5DA, 0) && Py >= 440 {
         while not CheckColor(39, 440, "EDE5DA") {
             Send "{WheelUp}"
             Sleep 40
+            if A_Index > 20
+                break
         }
     } else {
         while not CheckColor(39, 457, "EDE5DA") {
             Send "{WheelDown}"
             Sleep 40
+            if A_Index > 20
+                break
         }
     }
     ; 拖地图
-    Click 1450 * w / 1600, 373 * h / 900, "Down"
+    Sleep 200
+    while not _drag_map() {
+        Click "Up"
+        _reset_map(delay)
+        if delay == 800 or A_Index > 2 {
+            break
+        }
+        Sleep 1000
+    }
+    Sleep 50
+    if checkonly {
+        ret := PixelSearch(&Px, &Py, 520, 392, 970, 394, 0xFEFEFE, 4)
+        send "m"
+        return ret
+    }
+    if PixelSearch(&Px, &Py, 520, 392, 970, 394, 0xFEFEFE, 4) {
+        Click "Up"
+        Sleep 100
+        Click Px, Py ; 水泽
+        Sleep 50
+        Click 1310, 839
+        return true
+    } else {
+        if delay > 800 {
+            send "m"
+        } else {
+            Click 788, 395, 0 ; 水泽
+        }
+        return false
+    }
+}
+
+_reset_map(delay) {
+    WinGetClientPos(&x, &y, &w, &h)
+    Click "Up"
+    while not CheckColor(1535, 25, "ECE5D8") {
+        Send "m"
+        Sleep delay
+        if A_Index > 2 {
+            break
+        }
+    }
+    Click 1532 * w / 1600, 846 * h / 900 ; 地图
+    Sleep 200
+    Click 1272 * w / 1600, 327 * h / 900 ; 枫丹
+    Sleep delay
+}
+
+_drag_map() {
+    Click "Up"
+    Click 1450, 373, "Down"
     loop {
         mouseXY(-40, 0)
         Sleep 11
         if A_Index > 10 {
             ; 找锚点
             if PixelSearch(&Px, &Py, 540, 392, 950, 394, 0xFEFEFE, 4) {
-                break
+                return true
             }
             if A_Index > 15
-                break
+                return false
         }
     }
-    Sleep 50
     Click "Up"
-    if PixelSearch(&Px, &Py, 520, 392, 970, 394, 0xFEFEFE, 4) {
-        Sleep 50
-        Click "Up"
-        Sleep 50
-        Click Px, Py, 0 ; 水泽
-        ; Sleep 50
-        ; Click 1310, 839
-    } else {
-        Click 788, 395, 0 ; 水泽
-    }
 }
 
 _copy_uid(flag := false) {
     Send "{F2}"
-    Sleep 500
+    Sleep 800
     WinGetClientPos(&x, &y, &w, &h)
     Click 279 * w / 1600, 179 * h / 900
     ; Click 206 * w / 1600, 194 * h / 900 ;测试
-    Sleep 200
+    Sleep 400
     Click 488 * w / 1600, 172 * h / 900
-    Sleep 300
+    Sleep 400
 
-    cap_and_ocr(x + 516, y + 161, 110 * w / 1600, 23 * w / 1600)
-    Sleep 150
-    ; Sleep 150
-    ; MsgBox(A_Clipboard)
-
+    uid := API.OCRUID(x + 516, y + 161, 110 * w / 1600, 23 * w / 1600)
     Send "{Escape}"
     Sleep 80
     if not flag {
         Send "{Escape}"
         Sleep 50
     }
+    return uid
 }
 _login() {
     SendEvent "+{End}^c"
@@ -159,38 +321,8 @@ _login() {
     Click 797, 578
 }
 
-cap_and_ocr(x, y, w, h) {
-    cmd := Format('curl "http://localhost:8888/uid?x={1:d}&y={2:d}&w={3:d}&h={4:d}"', x, y, w, h)
-    shell := ComObject("WScript.Shell")
-    exec := shell.Run(cmd, 0)
-    return
-}
-cap_and_ocr_text(x, y, w, h) {
-    cmd := Format('curl "http://localhost:8888/text?x={1:d}&y={2:d}&w={3:d}&h={4:d}"', x, y, w, h)
-    shell := ComObject("WScript.Shell")
-    exec := shell.Run(cmd, 0)
-    return
-}
 
-cap_and_ocr_qq(x, y, w, h) {
-    Click 513 * w / 1600, 161 * h / 900, 0
-    Sleep 400
-    Send "^!a"
-    Sleep 150
-    MouseClickDrag("Left", 0, 0, w, h, 0, "R")
-    Click -137, 23, 1, "Rel"
-    Sleep 800
-    WinActivate "图片查看器"
-    Click 1089, 69
-    Sleep 5
-    Send "^a^c"
-    Click 1240, 12
-    Sleep 15
-    return A_Clipboard
-}
-
-_f2() {
-    SendEvent "^c"
+_auto_enter() {
     WinActivate "原神"
     WinGetClientPos(&x, &y, &w, &h, "原神")
     if not CheckColor(380 * w / 1600, 844 * h / 900, "ECE5D8") {
@@ -206,18 +338,17 @@ _f2() {
     Click 1403 * w / 1600, 101 * h / 900
     Sleep 100
 
-    if RegExMatch(GetColor(257 * w / 1600, 295 * h / 900), "0xD.D.C.") == 0 {
+    if not CheckColor(257 * w / 1600, 295 * h / 900, "D.D.C.") {
         Click 1355 * w / 1600, 199 * h / 900
     }
 }
 
-sendtopu(reply := "") {
+_LineSep := Chr(13) . Chr(10)
+_auto_send(reply := "") {
     WinGetClientPos(&x, &y, &w, &h, "QQ频道")
     CoordMode "Pixel", "Screen"
     isSub := CheckColor(x + w - 115, y + h - 36, "1B1B1B")
     CoordMode "Pixel", "Client"
-    if A_Clipboard == "111111111"
-        return false
     if isSub {
         ; 私车
         if reply != "" {
@@ -334,9 +465,15 @@ _auto_f2() {
     WinGetClientPos(&x, &y, &w, &h)
     while not (CheckColor(300, 300, "1C1C22") or CheckColor(300, 300, "FFFFFF")) {
         Send "{F2}"
-        Sleep 380
+        Sleep 480
         MouseMove 55, 10
-        Sleep 420
+        loop 10 {
+            if CheckColor(61, 38, "D3BC8E") {
+                Click 1349, 197 + 104 * (A_Index - 1)
+                break
+            }
+            Sleep 200
+        }
         loop 6 {
             ; ToolTip(CheckColor(1352, 182 + 104 * (A_Index - 1), "323232"))
             if CheckColor(1352, 158 + 104 * (A_Index - 1), "3.3.3.")
@@ -344,7 +481,7 @@ _auto_f2() {
         }
         Sleep 33
         Send "{Escape}"
-        Sleep 350
+        Sleep 450
         if A_Index > 30
             break
     }
