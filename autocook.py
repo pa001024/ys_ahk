@@ -470,8 +470,8 @@ class GameControl:
         self.WaitColor(421, 166, "DAD5CB")
         self.Click(421, 166)
         self.WaitColor(537, 457, "A7B982")
-        (x, y) = self.toScreenPos(0, 0)
-        text = OCRNumber((x + 518, y + 164, x + 624, y + 183))
+        (x, y) = self.toScreenPos(518, 164)
+        text = OCRNumber((x, y, x + 106 * self.w // 1600, y + 19 * self.h // 900))
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
@@ -516,7 +516,7 @@ def main_loop():
     time.sleep(0.1)
     game = GameControl(hwnd)
     while game.isForeground():
-        if len(game.GetUIDList()) > 3:
+        if len(game.GetUIDList()) >= 3:
             time.sleep(5)
             continue
         game.AutoCook()
