@@ -17,14 +17,6 @@ numocr = CnOcr(det_model_name="naive_det", rec_model_name="en_PP-OCRv3")
 cnocr = CnOcr()
 
 
-# 识别屏幕
-def OCRText(region):
-    img = ImageGrab.grab(region)
-    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-    rst = cnocr.ocr_for_single_line(img)
-    return rst.get("text", "")
-
-
 # 识别数字
 def OCRNumber(region):
     img = ImageGrab.grab(region)
@@ -142,7 +134,6 @@ class GameControl:
         return None, None
 
     def PixelSearchImg(self, img, x1, y1, x2, y2, color, threshold=0.0):
-        self.x, self.y = self.toScreenPos(0, 0)
         for iy in range(y1, y2):
             for ix in range(x1, x2):
                 p = img[iy, ix]
@@ -151,7 +142,6 @@ class GameControl:
         return None, None
 
     def PixelSearchImgFromEnd(self, img, x1, y1, x2, y2, color, threshold=0.0):
-        self.x, self.y = self.toScreenPos(0, 0)
         for ix in range(x2 - 1, x1 - 1, -1):
             for iy in range(y2 - 1, y1 - 1, -1):
                 p = img[iy, ix]
@@ -163,16 +153,21 @@ class GameControl:
         bak = pyperclip.paste()
         pyperclip.copy(text)
         pg.hotkey("ctrl", "v")
+        time.sleep(0.1)
         pyperclip.copy(bak)
 
     def GetState(self):
         if self.CheckColor(924, 818, "ECE5D8") and self.CheckColor(675, 818, "313131"):  # 下方复活 真: 死亡界面
             return "dead"
-        if self.CheckColor(32, 47, "ECE5D8"):
-            if self.CheckColor(37, 91, "4A5366"):  # 左上返回 真: ESC 界面
-                return "esc"
+        if self.CheckColor(32, 47, "ECE5D8") and self.CheckColor(35, 35, "3B4255"):
             if self.CheckColor(854, 842, "ECE5D8"):  # 聊天发送按钮 真: 聊天界面
                 return "chat"
+            elif self.CheckColor(37, 91, "4A5366"):  # 左上返回 真: ESC 界面
+                return "esc"
+            elif self.CheckColor(41, 846, "DACEB7"):  # 左下加号 真: 聊天界面
+                return "esc"
+            else:
+                return "esc"
         if self.CheckColor(63, 38, "D3BC8E") and self.CheckColor(1537, 54, "ECE5D8"):  # 右上搜索 真: F2 界面
             return "f2"
         if self.CheckColor(333, 333, "1C1C22|FFFFFF|000000"):  # 加载界面
@@ -316,7 +311,7 @@ class GameControl:
 
     def AutoChat(self, text, auto_exit=True, timeout=10.0):
         console.log(f"[red]AutoChat: [pink]{text}")
-        if not self.EnterChat(timeout):
+        if self.GetState() != "chat" and not self.EnterChat(timeout):
             return False
         if not self.CheckColor(642, 842, "FFFFFF"):
             pg.press("enter")
@@ -375,16 +370,26 @@ class GameControl:
         time.sleep(0.2)
         self.Click(1272, 327)
         self.WaitState("map")
-        for _ in range(1, 3):
+        failed = True
+        for _ in range(3):
             if self.CheckColor(38, 473, "4B5366"):
+                failed = False
                 break
-            (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
-            mouse.press(Button.left)
-            self.Drag(x, y, 38, 375)
-            (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
-            self.Drag(x, y, 38, 473)
-            mouse.release(Button.left)
-            time.sleep(0.1)
+            for _ in range(100):
+                mouse.scroll(0, 1)
+            for _ in range(3):
+                self.Click(39, 545)
+                time.sleep(0.05)
+            for _ in range(3):
+                mouse.scroll(0, -1)
+                time.sleep(0.1)
+            # (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
+            # mouse.position = (x, y)
+            # mouse.press(Button.left)
+            # # self.Drag(x, y, 38, 375)
+            # (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
+            # self.Drag(x, y, 38, 473)
+            # mouse.release(Button.left)
         (x, y) = self.PixelSearch(1438, 381, 1492, 432, (0xBA, 0xBA, 0xBC), 0.04)
         if teleport and x is not None:
             self.Click(x, y)
@@ -393,8 +398,10 @@ class GameControl:
             time.sleep(0.3)
             self.Click(1227, 839)
             time.sleep(0.2)
-        self.EnterMain()
-        return x is not None
+        # self.EnterMain()
+        if failed:
+            console.log("[red]AutoCheckMap: [pink]超时")
+        return failed or x is not None
 
     def AutoExit(self):
         console.log("[red]AutoExit")
@@ -405,11 +412,11 @@ class GameControl:
     replyGroups = [
         [r"^不$|不行|不可以|不能|no|shg|珊瑚宫|留着|四连|-6|刚打过了", "打扰了！", "exit"],
         [
-            r"^[好哦嗯可行来进走去]|自[便取]|[打请][便打把吧呗]|^打$|随[便意]|^1|冲冲冲|good|欧克|阔以|可以|彳亍|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
-            "好的，我先走啦，一会就来~~ 谢谢~~",
+            r"^[好哦嗯可行来进走去]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|^打$|随[便意]|^1|冲冲冲|申请|good|欧克|阔以|可以|彳亍|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
+            "好的，我去换个号等会跟朋友过来~~ 谢谢~~",
             "success",
         ],
-        [r"什么|啥|哪个|那个|^\?|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
+        [r"材料|几只|什么|啥|哪个|那个|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
         [r"为什么|怎么不|干[嘛吗]", "这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~", "idle"],
         [r"帮我|^帮", "要帮忙的话可以让他们帮哦~~", "idle"],
         [r"要帮忙[嘛吗]", "不麻烦你了，让他们自己去吧~~", "idle"],
@@ -420,30 +427,55 @@ class GameControl:
     ]
 
     replySet = set()
+    okimg = cv2.imread("ok.png")
+
+    def RecognizeEmo(self, img):
+        emoimg = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        res = cv2.matchTemplate(self.okimg, emoimg, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        return max_val > 0.8
+
+    def RecognizeText(self, img):
+        # 预处理
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        mask = cv2.threshold(gray, 146, 255, cv2.THRESH_BINARY)[1]
+        ret = cv2.bitwise_and(gray, gray, mask=mask)
+        rst = cnocr.ocr_for_single_line(ret)
+        if rst and rst.get("score", 0) > 0.3:
+            text = rst.get("text", "")
+            return text
+        return ""
 
     def AutoReply(self):
         console.log("[red]AutoReply")
-        self.EnterChat()
-        img = ImageGrab.grab()
-        img = np.array(img)[self.y : self.y + self.h, self.x : self.x + self.w]
+        if self.GetState() != "chat" and not self.EnterChat():
+            return False
+        if self.GetState() == "main" and not self.is2p():
+            return True
+        self.x, self.y = self.toScreenPos(0, 0)
+        img = ImageGrab.grab((self.x, self.y, self.x + self.w, self.y + self.h))
+        img = np.array(img)
         y = 204
         x = 357
         while y < 730:
             (_, Py) = self.PixelSearchImg(img, 345, y, 351, 759, (0xFF, 0xFF, 0xFF), 0.03)
             if Py is None:
                 break
+            # 识别表情
+            if self.RecognizeEmo(img[Py + 42 : Py + 42 + 55, x : x + 50]):
+                console.log(f"[red]RecognizeEmo [green]{Py})")
+                self.AutoChat(self.replyGroups[1][1], auto_exit=False)
+                self.UploadUID()
+                self.AutoExit()
+                return True
+
+            # 识别文字
             (Px, _) = self.PixelSearchImgFromEnd(img, x, Py + 42, x + 490, Py + 42 + 32, (0xFF, 0xFF, 0xFF), 0.03)
             if Px is None:
                 y = Py + 119
                 continue
-            ret = img[Py + 42 : Py + 42 + 32, x : Px + 15]
-            # 预处理
-            gray = cv2.cvtColor(ret, cv2.COLOR_BGR2GRAY)
-            mask = cv2.threshold(gray, 146, 255, cv2.THRESH_BINARY)[1]
-            ret = cv2.bitwise_and(gray, gray, mask=mask)
-            rst = cnocr.ocr_for_single_line(ret)
-            if rst and rst.get("score", 0) > 0.3:
-                text = rst.get("text", "")
+            text = self.RecognizeText(img[Py + 42 : Py + 42 + 32, x : Px + 15])
+            if text:
                 console.log(f"[blue]({x},{y})识别结果：{text}")
                 for pattern, reply, action in self.replyGroups:
                     if re.search(pattern, text, re.IGNORECASE):
@@ -475,11 +507,20 @@ class GameControl:
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
-                requests.get(f"https://pa001024.pythonanywhere.com/add/{text}")
+                for _ in range(3):
+                    try:
+                        requests.get(f"https://pa001024.pythonanywhere.com/add/{text}")
+                    except requests.exceptions.RequestException:
+                        console.log("[red]上传UID失败")
+                        continue
+                    break
         self.Click(1, 1)
 
     def GetUIDList(self):
-        res = requests.get(f"https://pa001024.pythonanywhere.com/list")
+        try:
+            res = requests.get(f"https://pa001024.pythonanywhere.com/list")
+        except requests.exceptions.RequestException:
+            return []
         return res.text.split(",")
 
     def AutoCook(self):
@@ -492,13 +533,14 @@ class GameControl:
                 return False
         self.EnterChat()
         time.sleep(2)
-        self.AutoChat(f"{getTimeStr()}好呀，可以让我的几个朋友进来打几个怪不~~", auto_exit=False)
+        self.AutoChat(f"{getTimeStr()}好呀，可以打3个怪刷点摩拉不~~", auto_exit=False)
         time.sleep(3)
         self.AutoEmo(2, auto_exit=False)
         time.sleep(3)
         start_time = time.time()
+        wait_time = 40
         self.replySet = set()
-        while self.isForeground() and time.time() - start_time < 40:
+        while self.isForeground() and time.time() - start_time < wait_time:
             if self.AutoReply():
                 return True
             time.sleep(1)
@@ -520,8 +562,9 @@ def main_loop():
             time.sleep(5)
             continue
         game.AutoCook()
+        # game.AutoReply()
         time.sleep(1)
-    # console.log(game.AutoCheckMap(teleport=True))
+    # console.log(game.AutoCheckMap(teleport=False))
     # game.AutoF2()
     # game.AutoChat("你好！")
     # game.UploadUID()

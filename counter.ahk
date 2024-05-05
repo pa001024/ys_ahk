@@ -66,7 +66,7 @@ class YSCounter {
         }
         this.counter := this.counter + r
         this.oGui["Val"].value := String(this.counter)
-        if r > 0 and A_TickCount - this.counter_last_update_time > 1000 {
+        if r > 0 and A_TickCount - this.counter_last_update_time > 5000 {
             old := StrSplit(this.oGui["Time"].value, Chr(10))
             this.oGui["Time"].value := old[2] . Chr(10) . format_time_diff(A_TickCount - this.counter_last_update_time)
             this.counter_last_update_time := A_TickCount

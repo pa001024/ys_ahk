@@ -6,3 +6,5 @@ test.ipynb
 dist/
 build/
 autocook.spec
+dist_copy/
+counter.txt

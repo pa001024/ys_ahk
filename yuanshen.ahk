@@ -105,17 +105,36 @@ CapsLock & 4:: {
 F3:: _auto_teleport()
 ; 打完拳皇传送2
 F5:: {
-  Send "m"
-  Sleep 750
-  Click 1029, 893, "Down"
-  loop {
-    mouseXY(-16, -22)
-    Sleep 2
-    if A_Index > 22
-      break
-  }
-  Click "Up"
-  Click 580, 544, 0
+  Send "{F1}"
+  Sleep 800
+  Click 247, 455 ; 讨伐
+  Sleep 50
+  Click 474, 171 ; 全部
+  Sleep 20
+  Click 466, 357 ; 首领
+  Sleep 20
+  Click 725, 429 ; 纯水
+  Sleep 20
+  Click 1212, 700 ; 取消追踪
+  Sleep 88
+  Click 1212, 700 ; 追踪
+  Sleep 100
+  Click 38, 542 ; -
+  Sleep 180
+  Click 108, 535 ; 锚点
+  Sleep 80
+  Click 1233, 839 ; 传送
+  ; Send "m"
+  ; Sleep 750
+  ; Click 1029, 893, "Down"
+  ; loop {
+  ;   mouseXY(-16, -22)
+  ;   Sleep 2
+  ;   if A_Index > 22
+  ;     break
+  ; }
+  ; Click "Up"
+  ; Click 580, 544, 0
 }
 ; 发地
 F4:: A_Clipboard := _copy_uid()

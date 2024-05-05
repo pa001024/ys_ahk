@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UID</title>
+    <title>万民堂</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 
@@ -16,17 +16,27 @@
             <button @click="addUid">添加</button>
         </div>
         <div class="uid-list">
-            <p>当前饭数：{{ uidList.length }} / 3</p>
-            <ul v-if="uidList.length">
-                <li v-for="(uid, index) in uidList" :key="index" @click="copyUid(index)">
-                    <label>{{ uid }}</label>
+            <p>当前饭数：{{ uidList.length }} / 3 已做: {{ uidCount }}</p>
+            <transition-group name="list" tag="ul" v-if="uidList.length">
+                <li class="list-item" v-for="(uid, index) in uidList" :key="uid.uid" @click="copyUid(index)">
+                    <label>{{ uid.uid }}</label>
+                    <span>{{ formatTimeDiff(nowSeconds - uidList[index].time) }}</span>
                     <button @click.stop="removeUid(index)">拿走</button>
                 </li>
-            </ul>
+            </transition-group>
             <p v-else>饭吃完了，新饭马上端上来</p>
         </div>
         <div class="tip">
             <p>提示：吃一碗拿一碗，不要浪费。当饭不满3碗时，系统会自动补充。</p>
+        </div>
+        <div class="uid-list">
+            <h2>历史记录</h2>
+            <ul>
+                <li class="history-item" v-for="(item, index) in uidHistory" :key="index" @click="copyText(item.uid)">
+                    <label>{{ item.uid }}</label>
+                    <span>{{ formatTimeDiff(nowSeconds - item.time) }}</span>
+                </li>
+            </ul>
         </div>
     </div>
 </body>
@@ -35,19 +45,37 @@
 <script>
     const { createApp, ref } = Vue
 
-    const baseURL = location.hostname === 'pa001024.pythonanywhere.com' ? '/' : 'https://pa001024.pythonanywhere.com/'
+    const baseURL = '/'//location.hostname === 'pa001024.pythonanywhere.com' ? '/' : 'https://pa001024.pythonanywhere.com/'
     createApp({
         setup() {
+            const nowSeconds = ref(0)
             const uidList = ref([])
+            const uidHistory = ref([])
             const newUid = ref("")
+            const cookerCount = ref(0)
+            const uidCount = ref(0)
             const updateUidList = async () => {
-                const response = await fetch(baseURL + 'list')
-                const data = await response.text()
-                uidList.value = data ? data.split(',') : []
-                console.log(uidList.value)
+                const response = await fetch(baseURL + 'uid')
+                const data = await response.json()
+                console.log(data)
+                uidList.value = data.current
+                uidHistory.value = data.history
+                uidCount.value = data.count
+                cookerCount.value = data.cookers
             }
             updateUidList()
             setInterval(updateUidList, 10000)
+
+            const formatTimeDiff = (time) => {
+                const minute = ~~(time / 60)
+                const second = time % 60
+                return minute > 15 ? `很久之前` : `${minute}分${second}秒前`
+            }
+            const updateTime = () => {
+                nowSeconds.value = ~~(Date.now() / 1000)
+            }
+            updateTime()
+            setInterval(updateTime, 1000)
 
             const copyText = async (text) => {
                 if (navigator.clipboard && window.isSecureContext) {
@@ -72,22 +100,23 @@
                         return
                 }
                 const uid = uidList.value.splice(index, 1)
-                fetch(baseURL + 'del/' + uid)
+                fetch(baseURL + 'del/' + uid[0].uid)
             }
             const copyUid = async (index) => {
                 const uid = uidList.value[index]
-                await copyText(uid)
+                await copyText(uid.uid)
             }
 
             const addUid = async () => {
                 if (newUid.value) {
-                    uidList.value.push(newUid.value)
+                    uidList.value.push({ uid: newUid.value, time: nowSeconds.value })
+                    uidCount.value += 1
                     await fetch(baseURL + 'add/' + newUid.value)
                     newUid.value = ''
                 }
             }
             return {
-                uidList, removeUid, copyUid, addUid, newUid
+                nowSeconds, uidList, uidHistory, newUid, cookerCount, uidCount, removeUid, copyUid, addUid, newUid, formatTimeDiff
             }
         }
     }).mount('#app')
@@ -99,6 +128,7 @@
         margin: 0;
         padding: 0;
         background-color: #f2f2f2;
+        overflow: x-hidden;
     }
 
     h1 {
@@ -120,24 +150,39 @@
         margin: 1rem 2rem;
         padding: 0;
         list-style: none;
+        position: relative;
     }
 
     .uid-list ul li {
         border: 1px solid #ccc;
-        padding: 10px;
+        padding: 10px 20px;
         margin-bottom: 10px;
-        border-radius: 2px;
+        border-radius: 3px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         background-color: white;
         cursor: pointer;
-
+        transition: all 0.5s ease;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
     }
 
     .uid-list ul li:last-child {
         margin-bottom: 0;
     }
+
+    .uid-list ul li span {
+        font-size: 13px;
+        color: #999;
+        user-select: none;
+        pointer-events: none;
+        position: absolute;
+        left: 50%;
+        text-align: center;
+        margin: -50px;
+        width: 100px;
+    }
+
 
     .uid-list ul li:hover {
         background-color: #ddd;
@@ -145,17 +190,19 @@
 
     .uid-list ul li label {
         font-size: 18px;
+        color: #333;
         font-weight: bold;
         pointer-events: none;
+        font-family: ui-monospace;
     }
 
     .uid-list ul li button {
         font-size: 18px;
-        padding: 5px 10px;
+        padding: 8px 16px;
         background-color: #4CAF50;
         color: white;
         border: none;
-        border-radius: 2px;
+        border-radius: 3px;
         cursor: pointer;
     }
 
@@ -169,7 +216,7 @@
         padding: 10px;
         font-size: 18px;
         border: none;
-        border-radius: 2px;
+        border-radius: 3px;
         margin-right: 10px;
     }
 
@@ -179,7 +226,7 @@
         background-color: #4CAF50;
         color: white;
         border: none;
-        border-radius: 2px;
+        border-radius: 3px;
         cursor: pointer;
     }
 
@@ -188,5 +235,53 @@
         text-align: center;
         font-size: 18px;
         color: #999;
+    }
+
+    .history {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .history h2 {
+        font-size: 20px;
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .uid-list ul li.history-item {
+        margin: 0 20px 10px;
+        padding: 10px 20px;
+        font-size: 18px;
+        border: 0px solid #ccc;
+        border-radius: 3px;
+        cursor: pointer;
+        min-width: 25%;
+        background-color: #f9f9f9;
+        transition: all 0.5s ease;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .history-item:hover {
+        background-color: #ddd;
+    }
+
+
+    .list-item {
+        display: inline-block;
+    }
+
+    .list-enter-active,
+    .list-leave-active {
+        transition: all 0.5s ease;
+        position: absolute;
+        left: 0;
+        right: 0;
+        pointer-events: none;
+    }
+
+    .list-enter-from,
+    .list-leave-to {
+        opacity: 0;
+        transform: translateY(30px) scaleX(2);
     }
 </style>
