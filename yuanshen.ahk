@@ -8,10 +8,10 @@ SetWorkingDir A_ScriptDir ; 设置工作目录
 SetTitleMatchMode 3
 SetCapsLockState 0
 
-#Include basic.ahk
-#Include yuanshen_c.ahk
-#Include counter.ahk
-#Include uid.ahk
+#Include ahk/basic.ahk
+#Include ahk/yuanshen_c.ahk
+#Include ahk/counter.ahk
+#Include ahk/uid.ahk
 
 YSMain.Init()
 class YSMain {

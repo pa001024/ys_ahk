@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>万民堂</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
+    <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script>
 </head>
 
 <body>
@@ -18,7 +19,7 @@
         <div class="uid-list">
             <p>当前饭数：{{ uidList.length }} / 3 已做: {{ uidCount }}</p>
             <transition-group name="list" tag="ul" v-if="uidList.length">
-                <li class="list-item" v-for="(uid, index) in uidList" :key="uid.uid" @click="copyUid(index)">
+                <li class="list-item" v-for="(uid, index) in uidList" :key="uid.uid" @click="copyText(uid.uid)">
                     <label>{{ uid.uid }}</label>
                     <span>{{ formatTimeDiff(nowSeconds - uidList[index].time) }}</span>
                     <button @click.stop="removeUid(index)">拿走</button>
@@ -44,27 +45,53 @@
 </html>
 <script>
     const { createApp, ref } = Vue
+    const roomid = (location.pathname.match(/\/[A-Za-z0-9]+$/) || '/')[0].substr(1) || 'default'
+    const socket = io("/", { query: { room: roomid } })
 
-    const baseURL = '/'//location.hostname === 'pa001024.pythonanywhere.com' ? '/' : 'https://pa001024.pythonanywhere.com/'
+    const baseURL = location.pathname == '/' ? '' : location.pathname
     createApp({
         setup() {
             const nowSeconds = ref(0)
             const uidList = ref([])
             const uidHistory = ref([])
             const newUid = ref("")
-            const cookerCount = ref(0)
             const uidCount = ref(0)
             const updateUidList = async () => {
-                const response = await fetch(baseURL + 'uid')
+                if (socket.id) return
+                const response = await fetch(baseURL + '/uid')
                 const data = await response.json()
                 console.log(data)
                 uidList.value = data.current
                 uidHistory.value = data.history
                 uidCount.value = data.count
-                cookerCount.value = data.cookers
             }
             updateUidList()
             setInterval(updateUidList, 10000)
+
+            socket.on("connect", () => {
+                console.info("[socket.io] connected:", socket.id);
+            });
+
+            socket.on("disconnect", () => {
+                console.info("[socket.io] disconnected");
+            });
+            socket.on("connect_error", (error) => {
+                if (socket.active) {
+                    // temporary failure, the socket will automatically try to reconnect
+                } else {
+                    // the connection was denied by the server
+                    // in that case, `socket.connect()` must be manually called in order to reconnect
+                    console.error("[socket.io] connection error:", error.message);
+                    // socket.connect()
+                }
+            });
+            socket.on("update", (data) => {
+                console.info("[socket.io] update:", data);
+                uidList.value = data.current
+                uidHistory.value = data.history
+                uidCount.value = data.count
+            });
+
 
             const formatTimeDiff = (time) => {
                 const minute = ~~(time / 60)
@@ -94,29 +121,33 @@
             }
             const removeUid = async (index) => {
                 try {
-                    await copyUid(index)
+                    await copyText(uidList.value[index].uid)
                 } catch (e) {
                     if (!confirm('复制失败，确认要删除吗？'))
                         return
                 }
                 const uid = uidList.value.splice(index, 1)
-                fetch(baseURL + 'del/' + uid[0].uid)
+                uidHistory.value.unshift({ uid: uid[0].uid, time: uid[0].time })
+                if (socket.id) {
+                    socket.emit("del_uid", uid[0].uid)
+                } else {
+                    await fetch(baseURL + 'del/' + uid[0].uid)
+                }
             }
-            const copyUid = async (index) => {
-                const uid = uidList.value[index]
-                await copyText(uid.uid)
-            }
-
             const addUid = async () => {
                 if (newUid.value) {
                     uidList.value.push({ uid: newUid.value, time: nowSeconds.value })
                     uidCount.value += 1
-                    await fetch(baseURL + 'add/' + newUid.value)
+                    if (socket.id) {
+                        socket.emit("add_uid", newUid.value)
+                    } else {
+                        await fetch(baseURL + 'add/' + newUid.value)
+                    }
                     newUid.value = ''
                 }
             }
             return {
-                nowSeconds, uidList, uidHistory, newUid, cookerCount, uidCount, removeUid, copyUid, addUid, newUid, formatTimeDiff
+                nowSeconds, uidList, uidHistory, newUid, uidCount, removeUid, copyText, addUid, newUid, formatTimeDiff
             }
         }
     }).mount('#app')

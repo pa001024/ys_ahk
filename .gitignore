@@ -8,3 +8,5 @@ build/
 autocook.spec
 dist_copy/
 counter.txt
+node_modules/
+server/rooms/

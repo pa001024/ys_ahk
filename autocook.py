@@ -11,10 +11,27 @@ import win32gui as wg
 from rich.console import Console
 from pynput.mouse import Button, Controller
 import pyperclip
+import configparser
 
 console = Console()
 numocr = CnOcr(det_model_name="naive_det", rec_model_name="en_PP-OCRv3")
 cnocr = CnOcr()
+
+# 读取配置文件
+config = configparser.ConfigParser()
+config.read("autocook.ini", encoding="utf-8")
+
+cfg_endpoint = config.get("cook", "endpoint")
+cfg_checkmap = config.getint("cook", "checkmap")
+cfg_entermsg = config.get("cook", "entermsg")
+cfg_enteremo = config.getint("cook", "enteremo")
+cfg_successmsg = config.get("cook", "successmsg")
+cfg_successemo = config.getint("cook", "successemo")
+cfg_exitmsg = config.get("cook", "exitmsg")
+cfg_exitemo = config.getint("cook", "exitemo")
+cfg_timeout = config.getint("cook", "timeout")
+cfg_timeoutmsg = config.get("cook", "timeoutmsg")
+cfg_timeoutemo = config.getint("cook", "timeoutemo")
 
 
 # 识别数字
@@ -54,7 +71,7 @@ def getTimeStr():
         return "晚上"
     elif now.hour < 9:
         return "早上"
-    elif now.hour < 10:
+    elif now.hour < 11:
         return "上午"
     elif now.hour < 14:
         return "中午"
@@ -93,8 +110,13 @@ class GameControl:
 
     def Drag(self, x1, y1, x2, y2, step=1, interval=0.001):
         mouse.position = self.toScreenPos(x1, y1)
+        mouse.press(Button.left)
+        self.MoveTo(x1, y1, x2, y2, step, interval)
+        mouse.release(Button.left)
+
+    def MoveTo(self, x1, y1, x2, y2, step=1, interval=0.001):
+        mouse.position = self.toScreenPos(x1, y1)
         (x, y) = self.toScreenPos(x2, y2)
-        # mouse.press(Button.left)
         while mouse.position[0] != x or mouse.position[1] != y:
             mouse.move(
                 0 if abs(mouse.position[0] - x) < step else step if mouse.position[0] < x else -step,
@@ -103,7 +125,6 @@ class GameControl:
             if abs(mouse.position[0] - x) < step and abs(mouse.position[1] - y) < step:
                 mouse.position = (x, y)
             time.sleep(interval)
-        # mouse.release(Button.left)
 
     def CheckColorS(self, screen, x, y, color):
         p = screen.getpixel(self.toScreenPos(x, y))
@@ -194,7 +215,6 @@ class GameControl:
         return state
 
     def WaitState(self, states: list[str] | str, timeout=15.0):
-        console.log(f"[red]WaitState: [pink]{states}")
         start_time = time.time()
         current_state = self.GetState()
         while not (any(state == current_state for state in states) if isinstance(states, list) else current_state == states):
@@ -206,16 +226,15 @@ class GameControl:
         return True
 
     def EnterMain(self, timeout=15.0):
-        console.log("[red]EnterMain")
+        # console.log("[gray]EnterMain")
         start_time = time.time()
-
         while self.isForeground():
             state = self.GetState()
             if state == "dead":
                 self.Click(924, 818)
                 if self.WaitState("main"):
                     return True
-            if state == "pchat" or state == "chat" or state == "map" or state == "f2" or state == "esc":
+            if state == "chat" or state == "map" or state == "f2" or state == "esc":
                 pg.press("esc")
                 if self.WaitState("main"):
                     return True
@@ -237,7 +256,7 @@ class GameControl:
         raise SystemExit("切换窗口 停止操作")
 
     def EnterChat(self, timeout=10.0):
-        console.log("[red]EnterChat")
+        # console.log("[gray]EnterChat")
         start_time = time.time()
         while self.isForeground():
             state = self.GetState()
@@ -262,7 +281,7 @@ class GameControl:
         raise SystemExit("切换窗口 停止操作")
 
     def EnterMap(self, timeout=10.0):
-        console.log("[red]EnterMap")
+        # console.log("[gray]EnterMap")
         start_time = time.time()
         while self.isForeground():
             state = self.GetState()
@@ -279,6 +298,8 @@ class GameControl:
                 if self.WaitState("map", 1):
                     return True
             elif state == "unknown":
+                if time.time() - start_time > 3:
+                    pg.press("esc")
                 time.sleep(0.1)
                 continue
             else:
@@ -287,7 +308,7 @@ class GameControl:
         raise SystemExit("切换窗口 停止操作")
 
     def EnterF2(self, timeout=10.0):
-        console.log("[red]EnterF2")
+        # console.log("[gray]EnterF2")
         start_time = time.time()
         while self.isForeground():
             state = self.GetState()
@@ -310,7 +331,7 @@ class GameControl:
     last_chat_time = 0
 
     def AutoChat(self, text, auto_exit=True, timeout=10.0):
-        console.log(f"[red]AutoChat: [pink]{text}")
+        console.log(f"[blue]AutoChat: [green]{text}")
         if self.GetState() != "chat" and not self.EnterChat(timeout):
             return False
         if not self.CheckColor(642, 842, "FFFFFF"):
@@ -327,7 +348,7 @@ class GameControl:
         return True
 
     def AutoEmo(self, index, auto_exit=True, timeout=10.0):
-        console.log(f"[red]AutoEmo: [pink]{index}")
+        console.log(f"[blue]AutoEmo: [green]{index}")
         if not self.EnterChat(timeout):
             return False
         if self.CheckColor(758, 854, "ECE5D8") and self.CheckColor(758, 846, "3B4255"):
@@ -347,61 +368,48 @@ class GameControl:
         return True
 
     def AutoF2(self):
-        console.log("[red]AutoF2")
-        while self.isForeground() and not self.CheckColor(333, 333, "1C1C22|FFFFFF"):
-            if self.GetState() == "loading":
-                return True
-            elif self.GetState() == "main" and self.is2p():
-                return True
-            if not self.EnterF2(3):
-                return True
-            screen = ImageGrab.grab()
-            for i in range(1, 7):
-                if self.CheckColorS(screen, 1352, 158 + 104 * (i - 1), "3.3.3."):
-                    self.Click(1349, 197 + 104 * (i - 1))
-                    time.sleep(0.01)
-            pg.press("esc")
-            time.sleep(0.1)
+        with console.status("[red]AutoF2"):
+            while self.isForeground() and not self.CheckColor(333, 333, "1C1C22|FFFFFF"):
+                if self.GetState() == "loading":
+                    return True
+                elif self.GetState() == "main" and self.is2p():
+                    return True
+                if not self.EnterF2(3):
+                    return True
+                screen = ImageGrab.grab()
+                for i in range(1, 7):
+                    if self.CheckColorS(screen, 1352, 158 + 104 * (i - 1), "3.3.3."):
+                        self.Click(1349, 197 + 104 * (i - 1))
+                        time.sleep(0.01)
+                pg.press("esc")
+                time.sleep(0.1)
 
     def AutoCheckMap(self, teleport=False):
-        console.log("[red]AutoCheckMap")
-        self.EnterMap()
-        self.Click(1532, 846)
-        time.sleep(0.2)
-        self.Click(1272, 327)
-        self.WaitState("map")
-        failed = True
-        for _ in range(3):
-            if self.CheckColor(38, 473, "4B5366"):
-                failed = False
-                break
+        with console.status("[red]AutoCheckMap"):
+            self.EnterMap()
+            self.Click(1532, 846)
+            time.sleep(0.2)
+            self.Click(1272, 327)
+            self.WaitState("map")
             for _ in range(100):
                 mouse.scroll(0, 1)
             for _ in range(3):
                 self.Click(39, 545)
-                time.sleep(0.05)
-            for _ in range(3):
-                mouse.scroll(0, -1)
-                time.sleep(0.1)
-            # (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
-            # mouse.position = (x, y)
-            # mouse.press(Button.left)
-            # # self.Drag(x, y, 38, 375)
-            # (x, y) = self.PixelSearch(37, 365, 39, 534, (0x4B, 0x53, 0x66))
-            # self.Drag(x, y, 38, 473)
-            # mouse.release(Button.left)
-        (x, y) = self.PixelSearch(1438, 381, 1492, 432, (0xBA, 0xBA, 0xBC), 0.04)
-        if teleport and x is not None:
-            self.Click(x, y)
-            self.WaitColor(1080, 618, "FFFFFF")
-            self.Click(1080, 610)
+                time.sleep(0.02)
             time.sleep(0.3)
-            self.Click(1227, 839)
-            time.sleep(0.2)
-        # self.EnterMain()
-        if failed:
-            console.log("[red]AutoCheckMap: [pink]超时")
-        return failed or x is not None
+            for _ in range(4):
+                mouse.scroll(0, -1)
+                time.sleep(0.2)
+            (x, y) = self.PixelSearch(1438, 381, 1492, 432, (0xBA, 0xBA, 0xBC), 0.04)
+            if teleport and x is not None:
+                self.Click(x, y)
+                self.WaitColor(1080, 618, "FFFFFF")
+                self.Click(1080, 610)
+                time.sleep(0.3)
+                self.Click(1227, 839)
+                time.sleep(0.2)
+        console.log(f"[green]AutoCheckMap: [green]{x is not None}")
+        return x is not None
 
     def AutoExit(self):
         console.log("[red]AutoExit")
@@ -410,22 +418,24 @@ class GameControl:
             self.Click(1305, 845)
 
     replyGroups = [
-        [r"^不$|不行|不可以|不能|no|shg|珊瑚宫|留着|四连|-6|刚打过了", "打扰了！", "exit"],
+        [r"^不$|不行|不可以|不能|no|shg|珊瑚宫|留着|四连|-6|刚打过了", cfg_exitmsg, "exit"],
         [
-            r"^[好哦嗯可行来进走去]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|^打$|随[便意]|^1|冲冲冲|申请|good|欧克|阔以|可以|彳亍|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
-            "好的，我去换个号等会跟朋友过来~~ 谢谢~~",
+            r"^[好哦嗯可行来进走去]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|打$|随[便意]|^1|冲冲冲|申请|good|欧克|阔以|可以|彳[亍于]|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
+            cfg_successmsg,
             "success",
         ],
-        [r"材料|几只|什么|啥|哪个|那个|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
+        [r"怎么打|材料|几只|什么|啥|哪个|那个|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
         [r"为什么|怎么不|干[嘛吗]", "这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~", "idle"],
         [r"帮我|^帮", "要帮忙的话可以让他们帮哦~~", "idle"],
         [r"要帮忙[嘛吗]", "不麻烦你了，让他们自己去吧~~", "idle"],
         [r"^你知道", "我不知道哦~~你可以问问他们", "idle"],
         [r"没开|没解锁", "没事的，锚点开了就行", "idle"],
-        [r"挂\?|开了|大哥", "不会哦，你一会可以看展柜", "idle"],
+        [r"挂\?|开了|大哥|开挂", "不会哦，你一会可以看展柜", "idle"],
+        [r"你朋友", "嗯啊我来探路", "idle"],
         # [r"核爆", "打点摩拉而已", "idle"],
     ]
 
+    inputSet = set()
     replySet = set()
     okimg = cv2.imread("ok.png")
 
@@ -447,7 +457,8 @@ class GameControl:
         return ""
 
     def AutoReply(self):
-        console.log("[red]AutoReply")
+        if self.GetState() == "loading":
+            return True
         if self.GetState() != "chat" and not self.EnterChat():
             return False
         if self.GetState() == "main" and not self.is2p():
@@ -463,12 +474,14 @@ class GameControl:
                 break
             # 识别表情
             if self.RecognizeEmo(img[Py + 42 : Py + 42 + 55, x : x + 50]):
-                console.log(f"[red]RecognizeEmo [green]{Py})")
-                self.AutoChat(self.replyGroups[1][1], auto_exit=False)
+                console.log(f"[green]RecognizeEmo [green]({Py})")
+                if cfg_successmsg:
+                    self.AutoChat(cfg_successmsg, auto_exit=False)
+                if cfg_successemo:
+                    self.AutoEmo(cfg_successemo, auto_exit=False)
                 self.UploadUID()
                 self.AutoExit()
                 return True
-
             # 识别文字
             (Px, _) = self.PixelSearchImgFromEnd(img, x, Py + 42, x + 490, Py + 42 + 32, (0xFF, 0xFF, 0xFF), 0.03)
             if Px is None:
@@ -476,27 +489,39 @@ class GameControl:
                 continue
             text = self.RecognizeText(img[Py + 42 : Py + 42 + 32, x : Px + 15])
             if text:
-                console.log(f"[blue]({x},{y})识别结果：{text}")
+                if text in self.inputSet:
+                    y = Py + 119
+                    continue
+                self.inputSet.add(text)
+                console.log(f"[green]RecognizeText [green]({x},{y}): {text}")
                 for pattern, reply, action in self.replyGroups:
                     if re.search(pattern, text, re.IGNORECASE):
                         if reply in self.replySet:
                             continue
                         self.replySet.add(reply)
                         time.sleep(2)
-                        self.AutoChat(reply, auto_exit=False)
                         if action == "exit":
+                            if cfg_exitmsg:
+                                self.AutoChat(cfg_exitmsg, auto_exit=False)
+                            if cfg_exitemo:
+                                self.AutoEmo(cfg_exitemo, auto_exit=False)
                             self.AutoExit()
                             return True
                         elif action == "success":
+                            if cfg_successmsg:
+                                self.AutoChat(cfg_successmsg, auto_exit=False)
+                            if cfg_successemo:
+                                self.AutoEmo(cfg_successemo, auto_exit=False)
                             self.UploadUID()
                             self.AutoExit()
                             return True
+                        self.AutoChat(reply, auto_exit=False)
 
             y = Py + 119
         return False
 
     def UploadUID(self):
-        console.log("[green]UploadUID")
+        console.status("[green]UploadUID")
         self.EnterF2()
         self.Click(279, 179)
         self.WaitColor(421, 166, "DAD5CB")
@@ -509,7 +534,7 @@ class GameControl:
             if re.match(r"^\d{9}$", text):
                 for _ in range(3):
                     try:
-                        requests.get(f"https://pa001024.pythonanywhere.com/add/{text}")
+                        requests.get(f"{cfg_endpoint}add/{text}")
                     except requests.exceptions.RequestException:
                         console.log("[red]上传UID失败")
                         continue
@@ -518,7 +543,7 @@ class GameControl:
 
     def GetUIDList(self):
         try:
-            res = requests.get(f"https://pa001024.pythonanywhere.com/list")
+            res = requests.get(f"{cfg_endpoint}list")
         except requests.exceptions.RequestException:
             return []
         return res.text.split(",")
@@ -528,23 +553,31 @@ class GameControl:
         if self.EnterMain() and not self.is2p():
             self.AutoF2()
         if self.WaitState("main") and self.is2p():
-            if not self.AutoCheckMap():
+            if cfg_checkmap and not self.AutoCheckMap():
                 self.AutoExit()
                 return False
         self.EnterChat()
         time.sleep(2)
-        self.AutoChat(f"{getTimeStr()}好呀，可以打3个怪刷点摩拉不~~", auto_exit=False)
-        time.sleep(3)
-        self.AutoEmo(2, auto_exit=False)
-        time.sleep(3)
+        if cfg_entermsg:
+            reply_text = re.sub(r"\{TIME\}", getTimeStr(), cfg_entermsg)
+            self.AutoChat(reply_text, auto_exit=False)
+            time.sleep(3)
+        if cfg_enteremo:
+            self.AutoEmo(cfg_enteremo, auto_exit=False)
         start_time = time.time()
-        wait_time = 40
+        wait_time = cfg_timeout
+        self.inputSet = set()
         self.replySet = set()
-        while self.isForeground() and time.time() - start_time < wait_time:
-            if self.AutoReply():
-                return True
-            time.sleep(1)
-        self.AutoChat("_(:з」∠)_")
+        with console.status("[red]AutoReply"):
+            while self.isForeground() and time.time() - start_time < wait_time:
+                if self.AutoReply():
+                    return True
+                time.sleep(1)
+        if cfg_timeoutmsg:
+            self.AutoChat(cfg_timeoutmsg, auto_exit=False)
+        if cfg_timeoutemo:
+            self.AutoEmo(cfg_timeoutemo, auto_exit=False)
+
         self.AutoExit()
         return False
 
@@ -558,11 +591,14 @@ def main_loop():
     time.sleep(0.1)
     game = GameControl(hwnd)
     while game.isForeground():
-        if len(game.GetUIDList()) >= 3:
-            time.sleep(5)
-            continue
-        game.AutoCook()
-        # game.AutoReply()
+        try:
+            if len(game.GetUIDList()) >= 3:
+                time.sleep(5)
+                continue
+            game.AutoCook()
+            # game.AutoReply()
+        except Exception as e:
+            console.log(f"[red]错误：{e}")
         time.sleep(1)
     # console.log(game.AutoCheckMap(teleport=False))
     # game.AutoF2()
