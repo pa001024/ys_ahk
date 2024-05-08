@@ -180,6 +180,8 @@ class GameControl:
     def GetState(self):
         if self.CheckColor(924, 818, "ECE5D8") and self.CheckColor(675, 818, "313131"):  # 下方复活 真: 死亡界面
             return "dead"
+        if self.CheckColor(723, 632, "4A5265") and self.CheckColor(671, 632, "313131"):  # 旧版本提示 真: 提示界面
+            return "esc"
         if self.CheckColor(32, 47, "ECE5D8") and self.CheckColor(35, 35, "3B4255"):
             if self.CheckColor(854, 842, "ECE5D8"):  # 聊天发送按钮 真: 聊天界面
                 return "chat"
@@ -420,7 +422,7 @@ class GameControl:
     replyGroups = [
         [r"^不$|不行|不可以|不能|no|shg|珊瑚宫|留着|四连|-6|刚打过了", cfg_exitmsg, "exit"],
         [
-            r"^[好哦嗯可行来进走去]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|打$|随[便意]|^1|冲冲冲|申请|good|欧克|阔以|可以|彳[亍于]|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
+            r"^[好哦嗯可行来进走去]无所谓|都[行好可]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|打$|随[遍便意]|^1|冲冲冲|申请|well|go|^o$|欧克|阔以|可以|彳[亍于]|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
             cfg_successmsg,
             "success",
         ],

@@ -1,102 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>自助餐</title>
+        <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
+        <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script>
+    </head>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>万民堂</title>
-    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
-    <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script>
-</head>
-
-<body>
-    <div id="app">
-        <h1>自助餐</h1>
-        <div class="input-group">
-            <input type="text" v-model="newUid" placeholder="自动做饭中...">
-            <button @click="addUid">添加</button>
+    <body>
+        <div id="app">
+            <header>
+                <div class="menu-list flex-box w100">
+                    <div class="menu-item player-name">
+                        {{ roomId === "default"? "万民堂" : roomId }}
+                        <span style="font-size: 12px; color: #999">({{ onlineCount }} / {{ maxClient }}) ~{{ uidCount }}份</span>
+                    </div>
+                    <div class="menu-item flex-box">
+                        <div class="username">{{player.name}}</div>
+                        <button type="button" class="ys-btn" @click="showSetting = !showSetting">设置</button>
+                    </div>
+                </div>
+            </header>
+            <article v-if="!showSetting" class="public-room vertical-box">
+                <div class="uid-list">
+                    <transition-group name="list" tag="ul">
+                        <li class="ys-list-item" v-for="(uid, index) in uidList" :key="uid.uid">
+                            <div class="content">
+                                <div class="cooker">{{ uid.cooker }}</div>
+                                <div class="uid">UID: {{ maskUid(uid.uid) }}</div>
+                            </div>
+                            <div class="time">⏳{{ formatTime(uid.cookTime) }}</div>
+                            <button type="button" class="ys-btn" @click.stop="removeUid(index)">拿走</button>
+                        </li>
+                    </transition-group>
+                    <!-- <p v-if="!uidList.length">饭吃完了，新饭马上端上来</p> -->
+                </div>
+                <div class="msg-list flex-1">
+                    <ul>
+                        <li class="ys-msg-item" :key="msg.id" v-for="(msg, index) in mixMsgList()" :key="msg.id">
+                            <div class="content banner" v-if="msg.cookTime">
+                                <div class="tip">{{ msg.user }}拿走了{{ maskUid(msg.uid) }}</div>
+                                <div class="time">{{ formatTime(msg.time) }}</div>
+                            </div>
+                            <div class="content banner" v-else-if="translateTag(msg.text) !== msg.text">
+                                <div class="tip">{{ msg.user }}{{ translateTag(msg.text) }}了房间</div>
+                                <div class="time">{{ formatTime(msg.time) }}</div>
+                            </div>
+                            <div class="content" v-else>
+                                <div class="user">{{ msg.user }}</div>
+                                <div class="text">{{ msg.text }}</div>
+                                <div class="time">{{ formatTime(msg.time) }}</div>
+                            </div>
+                            <div class="flex-1"></div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="flex-box">
+                    <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." @keyup.enter="addUid" />
+                    <button type="button" class="ys-btn ml-0" @click="addUid">发送</button>
+                </div>
+                <!-- <div class="uid-list">
+                    <h2>历史记录</h2>
+                    <ul>
+                        <li class="history-item" v-for="(item, index) in uidHistory" :key="index" @click="copyText(item.uid)">
+                            <label>{{ item.uid }}</label>
+                            <span>{{ formatTimeDiff(nowSeconds - item.time) }}</span>
+                        </li>
+                    </ul>
+                </div> -->
+            </article>
+            <article v-else class="welcome">
+                <div class="ys-btn-group">
+                    <button type="button" class="ys-btn" :class="{ checked: formRoomType === 'public' }" @click="formRoomType='public'">万民堂</button>
+                    <button type="button" class="ys-btn" :class="{ checked: formRoomType === 'private' }" @click="formRoomType='private'">新月轩</button>
+                </div>
+                <input class="ys-input" type="text" v-model="formPlayer.name" placeholder="请输入昵称" />
+                <div class="ys-btn-group" v-if="formRoomType === 'public'">
+                    <button type="button" class="ys-btn" :class="{ checked: 1 & formPlayer.flag }" @click="formPlayer.flag = 1 ^ formPlayer.flag">有C</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 2 & formPlayer.flag }" @click="formPlayer.flag = 2 ^ formPlayer.flag">有芙</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 4 & formPlayer.flag }" @click="formPlayer.flag = 4 ^ formPlayer.flag">有万</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 8 & formPlayer.flag }" @click="formPlayer.flag = 8 ^ formPlayer.flag">会淹</button>
+                </div>
+                <input v-if="formRoomType === 'private'" class="ys-input" type="text" v-model="formRoomId" placeholder="房间号" />
+                <button type="button" class="ys-btn" @click="joinRoom">加入</button>
+            </article>
         </div>
-        <div class="uid-list">
-            <p>当前饭数：{{ uidList.length }} / 3 已做: {{ uidCount }}</p>
-            <transition-group name="list" tag="ul" v-if="uidList.length">
-                <li class="list-item" v-for="(uid, index) in uidList" :key="uid.uid" @click="copyText(uid.uid)">
-                    <label>{{ uid.uid }}</label>
-                    <span>{{ formatTimeDiff(nowSeconds - uidList[index].time) }}</span>
-                    <button @click.stop="removeUid(index)">拿走</button>
-                </li>
-            </transition-group>
-            <p v-else>饭吃完了，新饭马上端上来</p>
-        </div>
-        <div class="tip">
-            <p>提示：吃一碗拿一碗，不要浪费。当饭不满3碗时，系统会自动补充。</p>
-        </div>
-        <div class="uid-list">
-            <h2>历史记录</h2>
-            <ul>
-                <li class="history-item" v-for="(item, index) in uidHistory" :key="index" @click="copyText(item.uid)">
-                    <label>{{ item.uid }}</label>
-                    <span>{{ formatTimeDiff(nowSeconds - item.time) }}</span>
-                </li>
-            </ul>
-        </div>
-    </div>
-</body>
-
+    </body>
 </html>
 <script>
-    const { createApp, ref } = Vue
-    const roomid = (location.pathname.match(/\/[A-Za-z0-9]+$/) || '/')[0].substr(1) || 'default'
-    const socket = io("/", { query: { room: roomid } })
+    const { createApp, ref, watch } = Vue
 
-    const baseURL = location.pathname == '/' ? '' : location.pathname
+    const baseURL = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/"
     createApp({
         setup() {
+            const roomId = ref((location.pathname.match(/\/[A-Za-z0-9]+$/) || "/")[0].substr(1) || "default")
+            const formRoomType = ref("public")
+            const formRoomId = ref("")
+            const formPlayer = ref({ name: "", flag: 0 })
+            const player = ref({ name: "", flag: 0 })
+            try {
+                if (localStorage.getItem("player")) formPlayer.value = player.value = JSON.parse(localStorage.getItem("player"))
+            } catch (e) {}
+            const socket = io("/", { query: { room: roomId.value, user: player.value.name } })
+            const showSetting = ref(!player.value.name)
             const nowSeconds = ref(0)
             const uidList = ref([])
             const uidHistory = ref([])
             const newUid = ref("")
             const uidCount = ref(0)
-            const updateUidList = async () => {
-                if (socket.id) return
-                const response = await fetch(baseURL + '/uid')
-                const data = await response.json()
+            const onlineCount = ref(0)
+            const maxClient = ref(0)
+            const msgList = ref([])
+            const translateTag = (tag) => {
+                const table = {
+                    "<enter>": "进入",
+                    "<leave>": "离开",
+                }
+                return table[tag] || tag
+            }
+            const updateData = (data) => {
                 console.log(data)
                 uidList.value = data.current
                 uidHistory.value = data.history
                 uidCount.value = data.count
+                msgList.value = data.msgs
+                onlineCount.value = data.clientCount
+                maxClient.value = data.maxClient
             }
-            updateUidList()
+            const updateUidList = async () => {
+                if (socket.id) return
+                const response = await fetch(baseURL + "uid")
+                const data = await response.json()
+                updateData(data)
+                scrollToBottom(true)
+            }
+
+            const mixMsgList = () => {
+                return [...uidHistory.value, ...msgList.value].sort((a, b) => a.time - b.time)
+            }
+
+            const scrollToBottom = (force = false) => {
+                const list = document.querySelector(".msg-list")
+                if (list.scrollTop >= list.scrollHeight - list.clientHeight) {
+                    Vue.nextTick(() => {
+                        list.scrollTop = list.scrollHeight
+                    })
+                }
+            }
+            setTimeout(updateUidList, 1000)
             setInterval(updateUidList, 10000)
 
             socket.on("connect", () => {
-                console.info("[socket.io] connected:", socket.id);
-            });
-
+                console.info("[socket.io] connected:", socket.id)
+            })
             socket.on("disconnect", () => {
-                console.info("[socket.io] disconnected");
-            });
-            socket.on("connect_error", (error) => {
-                if (socket.active) {
-                    // temporary failure, the socket will automatically try to reconnect
-                } else {
-                    // the connection was denied by the server
-                    // in that case, `socket.connect()` must be manually called in order to reconnect
-                    console.error("[socket.io] connection error:", error.message);
-                    // socket.connect()
-                }
-            });
+                console.info("[socket.io] disconnected")
+            })
             socket.on("update", (data) => {
-                console.info("[socket.io] update:", data);
-                uidList.value = data.current
-                uidHistory.value = data.history
-                uidCount.value = data.count
-            });
+                console.info("[socket.io] update:", data)
+                updateData(data)
+                scrollToBottom()
+            })
+            socket.on("reload", () => {
+                location.reload()
+            })
 
-
-            const formatTimeDiff = (time) => {
-                const minute = ~~(time / 60)
-                const second = time % 60
-                return minute > 15 ? `很久之前` : `${minute}分${second}秒前`
+            const formatTime = (time) => {
+                const diff = nowSeconds.value - time
+                if (diff <= 0) return "刚刚"
+                if (diff > 24 * 3600) return new Date(time * 1000).toLocaleString("zh")
+                if (diff > 3600) return new Date(time * 1000).toLocaleTimeString("zh")
+                const minute = ~~(diff / 60)
+                const second = diff % 60
+                return `${minute}分${second}秒前`
             }
             const updateTime = () => {
                 nowSeconds.value = ~~(Date.now() / 1000)
@@ -104,207 +181,427 @@
             updateTime()
             setInterval(updateTime, 1000)
 
+            const joinRoom = async () => {
+                const rt = formRoomType.value
+                const fp = formPlayer.value
+                if (rt === "public") {
+                    if (fp.name) {
+                        player.value = { name: fp.name.substring(0, 12), flag: fp.flag }
+                        localStorage.setItem("player", JSON.stringify(player.value))
+                        location.href = "/"
+                    } else {
+                        alert("请输入昵称")
+                    }
+                } else if (rt === "private") {
+                    if (formRoomId.value) {
+                        location.href = "/r/" + formRoomId.value
+                    } else {
+                        alert("请输入房间号")
+                    }
+                }
+            }
             const copyText = async (text) => {
                 if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(text)
                     return
                 }
-                const input = document.createElement('textarea')
+                const input = document.createElement("textarea")
                 input.value = text
+                input.style.position = "fixed"
+                input.style.opacity = "0"
                 document.body.appendChild(input)
                 input.focus()
                 input.select()
-                const result = document.execCommand('copy')
+                const result = document.execCommand("copy")
                 input.remove()
-                if (!result)
-                    throw new Error('复制失败')
+                if (!result) throw new Error("复制失败")
             }
             const removeUid = async (index) => {
                 try {
                     await copyText(uidList.value[index].uid)
                 } catch (e) {
-                    if (!confirm('复制失败，确认要删除吗？'))
-                        return
+                    if (!confirm("复制失败，确认要删除吗？")) return
                 }
                 const uid = uidList.value.splice(index, 1)
                 uidHistory.value.unshift({ uid: uid[0].uid, time: uid[0].time })
                 if (socket.id) {
                     socket.emit("del_uid", uid[0].uid)
                 } else {
-                    await fetch(baseURL + 'del/' + uid[0].uid)
+                    await fetch(baseURL + "del/" + uid[0].uid)
                 }
             }
             const addUid = async () => {
-                if (newUid.value) {
-                    uidList.value.push({ uid: newUid.value, time: nowSeconds.value })
-                    uidCount.value += 1
-                    if (socket.id) {
-                        socket.emit("add_uid", newUid.value)
+                if (newUid.value.trim()) {
+                    const text = newUid.value.trim()
+                    if (/^\d{9}$/.test(text)) {
+                        if (uidList.value.includes(text)) return
+                        if (uidHistory.value.some((item) => item.uid == text)) {
+                            uidHistory.value.splice(
+                                uidHistory.value.find((item) => item.uid == text),
+                                1
+                            )
+                        }
+                        uidList.value.push({ uid: text, time: nowSeconds.value })
+                        uidCount.value += 1
                     } else {
-                        await fetch(baseURL + 'add/' + newUid.value)
+                        msgList.value.push({
+                            id: Math.random().toString(36).substr(3),
+                            user: player.value.name,
+                            text,
+                            time: Math.floor(Date.now() / 1000),
+                        })
+                        scrollToBottom()
                     }
-                    newUid.value = ''
+                    if (socket.id) {
+                        socket.emit("add_uid", text)
+                    } else {
+                        await fetch(baseURL + "add/" + text)
+                    }
+                    newUid.value = ""
                 }
             }
-            return {
-                nowSeconds, uidList, uidHistory, newUid, uidCount, removeUid, copyText, addUid, newUid, formatTimeDiff
+            const maskUid = (uid) => {
+                return uid.slice(0, 3) + "***" + uid.slice(6)
             }
-        }
-    }).mount('#app')
+            return {
+                roomId,
+                showSetting,
+                formRoomType,
+                formRoomId,
+                formPlayer,
+                player,
+                nowSeconds,
+                uidList,
+                uidHistory,
+                newUid,
+                uidCount,
+                joinRoom,
+                removeUid,
+                copyText,
+                addUid,
+                newUid,
+                formatTime,
+                onlineCount,
+                msgList,
+                maskUid,
+                mixMsgList,
+                translateTag,
+                maxClient,
+            }
+        },
+    }).mount("#app")
 </script>
 
 <style>
     body {
+        --ys-color-primary: #d9d3c9;
+        --ys-color-text: #3d4356;
+        --ys-color-selected: #495267;
+        --ys-color-selected-text: #ece5d8;
+        --ys-color-bright: white;
+        --ys-color-dark: #333;
+        --ys-color-tip: #93806a;
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        background-color: #f2f2f2;
-        overflow: x-hidden;
+        overflow: hidden;
+        color: white;
+        background-color: #212134;
+    }
+    * {
+        box-sizing: border-box;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    body::after {
+        content: "";
+        position: fixed;
+        top: -0;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        background-image: url("/bg.png");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        filter: blur(5px);
+        z-index: -1;
+        opacity: 0.5;
     }
 
-    h1 {
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        background-color: rgba(0, 0, 0, 0.5);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1;
+        font-weight: bold;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .player-name {
+        font-size: 20px;
+        padding: 8px 24px;
+        background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
+    }
+
+    h2 {
         text-align: center;
-        margin-top: 50px;
+        font-size: 30px;
+        font-weight: bold;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    .uid-list {
-        margin-top: 20px;
-        text-align: center;
+    .welcome {
+        padding: 20px;
+        max-width: 800px;
+        margin: 60px auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        height: calc(100vh - 120px);
     }
 
-    .uid-list p {
+    .ys-input {
+        height: 40px;
+        margin: 10px;
+        padding: 14px 18px;
         font-size: 18px;
-        margin-bottom: 20px;
+        border: 2px solid #ccc;
+        border-radius: 50px;
+        font-weight: bold;
+        background-color: rgba(0, 0, 0, 0);
+        color: var(--ys-color-bright);
+        transition: background 0.3s ease;
+        transition-property: background, color;
+        box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    }
+
+    .welcome .ys-btn,
+    .welcome .ys-input {
+        width: calc(100% - 80px);
+    }
+
+    .ys-input::placeholder {
+        color: var(--ys-color-bright);
+    }
+
+    .ys-input:focus {
+        outline: none;
+        border-color: var(--ys-color-bright);
+        background-color: var(--ys-color-bright);
+        color: var(--ys-color-dark);
+    }
+    .ys-input:focus::placeholder {
+        color: var(--ys-color-dark);
+    }
+
+    .ys-btn-group {
+        display: flex;
+        justify-content: space-between;
+        width: calc(100% - 80px);
+    }
+    .ys-btn-group .ys-btn {
+        padding: 0 20px;
+        height: 40px;
+        margin: 10px 0;
+        background-color: var(--ys-color-selected);
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        color: var(--ys-color-selected-text);
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    .ys-btn-group .ys-btn:first-child {
+        border-top-left-radius: 50px;
+        border-bottom-left-radius: 50px;
+    }
+
+    .ys-btn-group .ys-btn:last-child {
+        border-top-right-radius: 50px;
+        border-bottom-right-radius: 50px;
+    }
+    .ys-btn-group .ys-btn:hover {
+        background-color: var(--ys-color-selected);
+        border-color: var(--ys-color-selected-text);
+    }
+    .ys-btn-group .ys-btn.checked {
+        background-color: var(--ys-color-selected-text);
+        color: var(--ys-color-selected);
+    }
+
+    .ys-btn {
+        height: 40px;
+        margin: 10px;
+        padding: 4px 25px;
+        background-color: var(--ys-color-primary);
+        font-size: 18px;
+        cursor: pointer;
+        color: var(--ys-color-selected);
+        font-weight: bold;
+        border: none;
+        border-radius: 50px;
+        transition: background 0.3s ease;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+        text-wrap: nowrap;
+    }
+    .ys-btn:hover {
+        background-color: var(--ys-color-selected-text);
+    }
+    .ys-btn:active {
+        opacity: 0.7;
+        color: white;
+        box-shadow: 0 0 10px var(--ys-color-primary);
+    }
+
+    .ys-list-item {
+        border: 2px solid var(--ys-color-primary);
+        border-radius: 50px;
+        padding: 0px 20px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--ys-color-primary);
+        transition: all 0.3s ease;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
+        position: relative;
+    }
+
+    .ys-list-item:nth-child(odd) {
+        background-image: linear-gradient(75deg, rgba(77, 126, 74, 0), rgba(77, 126, 74, 0), rgba(77, 126, 74, 0.3), rgba(77, 126, 74, 0.5));
+    }
+    .ys-list-item:nth-child(even) {
+        background-image: linear-gradient(75deg, rgba(37, 80, 171, 0), rgba(37, 80, 171, 0), rgba(37, 80, 171, 0.3), rgba(37, 80, 171, 0.5));
+    }
+
+    .ys-list-item:hover {
+        background-color: var(--ys-color-selected-text);
+        transform: scale(1.03);
+        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.3);
     }
 
     .uid-list ul {
         margin: 1rem 2rem;
-        padding: 0;
-        list-style: none;
         position: relative;
     }
-
-    .uid-list ul li {
-        border: 1px solid #ccc;
-        padding: 10px 20px;
-        margin-bottom: 10px;
-        border-radius: 3px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: white;
-        cursor: pointer;
-        transition: all 0.5s ease;
-        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    .uid-list ul li:last-child {
-        margin-bottom: 0;
-    }
-
-    .uid-list ul li span {
-        font-size: 13px;
-        color: #999;
-        user-select: none;
-        pointer-events: none;
-        position: absolute;
-        left: 50%;
-        text-align: center;
-        margin: -50px;
-        width: 100px;
-    }
-
-
-    .uid-list ul li:hover {
-        background-color: #ddd;
-    }
-
-    .uid-list ul li label {
+    .ys-list-item .content {
+        margin-left: 10px;
         font-size: 18px;
-        color: #333;
+        color: var(--ys-color-dark);
         font-weight: bold;
         pointer-events: none;
         font-family: ui-monospace;
+        text-shadow: 0px 0px 3px white, 0px 0px 2px white;
+    }
+    .ys-list-item .uid {
+        font-size: 14px;
+    }
+    .ys-list-item .time {
+        font-size: 14px;
+        color: var(--ys-color-tip);
+        font-weight: bold;
+        pointer-events: none;
+        user-select: none;
+        text-shadow: 0px 0px 3px white, 0px 0px 2px white;
+        position: absolute;
+        left: 180px;
+        bottom: 10px;
     }
 
-    .uid-list ul li button {
-        font-size: 18px;
-        padding: 8px 16px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
+    .msg-list {
+        overflow-y: scroll;
+        border-top: 2px solid var(--ys-color-primary);
     }
-
-    .input-group {
+    .msg-list::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    .msg-list::-webkit-scrollbar-thumb {
+        background-color: var(--ys-color-selected-text);
+        border-radius: 10px;
+    }
+    .msg-list::-webkit-scrollbar-track {
+        background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(217, 211, 201, 0.5), rgba(217, 211, 201, 0.5), rgba(0, 0, 0, 0));
+        border-radius: 10px;
+    }
+    .ys-msg-item {
+        margin: 8px 20px;
+        padding: 8px 4px;
         display: flex;
+        align-items: center;
+        position: relative;
         justify-content: center;
-        margin-top: 20px;
     }
-
-    .input-group input {
-        padding: 10px;
-        font-size: 18px;
-        border: none;
-        border-radius: 3px;
-        margin-right: 10px;
+    .ys-msg-item .time {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        font-size: 16px;
+        height: 20px;
+        line-height: 20px;
+        color: #cecdd1;
     }
-
-    .input-group button {
-        padding: 10px 20px;
-        font-size: 18px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
+    .ys-msg-item .user {
+        font-size: 16px;
+        color: #cecdd1;
+        margin-left: 20px;
+        height: 20px;
+        line-height: 20px;
+        overflow: hidden;
+        text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.3);
+        margin-bottom: 4px;
     }
-
-    .tip {
-        margin: 20px 30px;
-        text-align: center;
-        font-size: 18px;
-        color: #999;
-    }
-
-    .history {
-        margin-top: 20px;
-        text-align: center;
-    }
-
-    .history h2 {
+    .ys-msg-item .text {
         font-size: 20px;
-        margin-bottom: 20px;
-        color: #333;
+        color: var(--ys-color-bright);
+        background: var(--ys-color-text);
+        padding: 12px 20px;
+        border-radius: 25px;
+        margin-left: 14px;
+        position: relative;
+        filter: drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.3));
+        word-break: break-word;
+    }
+    .ys-msg-item .text::before {
+        position: absolute;
+        left: -18px;
+        top: 1px;
+        content: "";
+        width: 0;
+        height: 0;
+        border: 10px solid transparent;
+        border-right-width: 14px;
+        border-right-color: var(--ys-color-text);
+        transform: rotate(27deg);
+    }
+    .ys-msg-item .banner {
+        text-align: center;
+        background-color: rgba(67, 87, 50, 0.5);
+        border-radius: 5px;
+        padding: 4px 16px;
+    }
+    .ys-msg-item .banner + .flex-1 {
+        display: none;
     }
 
-    .uid-list ul li.history-item {
-        margin: 0 20px 10px;
-        padding: 10px 20px;
-        font-size: 18px;
-        border: 0px solid #ccc;
-        border-radius: 3px;
-        cursor: pointer;
-        min-width: 25%;
-        background-color: #f9f9f9;
-        transition: all 0.5s ease;
-        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    .history-item:hover {
-        background-color: #ddd;
-    }
-
-
-    .list-item {
-        display: inline-block;
+    .content {
+        max-width: 100%;
     }
 
     .list-enter-active,
     .list-leave-active {
-        transition: all 0.5s ease;
-        position: absolute;
+        transition: all 0.3s ease;
+        /* position: absolute; */
         left: 0;
         right: 0;
         pointer-events: none;
@@ -313,6 +610,38 @@
     .list-enter-from,
     .list-leave-to {
         opacity: 0;
-        transform: translateY(30px) scaleX(2);
+        transform: translateX(400px);
+    }
+
+    .vertical-box {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: space-between;
+        height: calc(100vh - 60px);
+        width: 100%;
+        position: absolute;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+    }
+    .w100 {
+        width: 100%;
+    }
+    .flex-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .flex-box.flex-center {
+        justify-content: center;
+    }
+    .flex-1 {
+        flex: 1;
+    }
+    .ml-0 {
+        margin-left: 0;
     }
 </style>

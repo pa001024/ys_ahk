@@ -101,29 +101,67 @@ CapsLock & 4:: {
   _auto_exit()
   YSCounter.Add(4)
 }
-; 传送
-F3:: _auto_teleport()
-; 打完拳皇传送2
-F5:: {
+; 传送利亚姆
+F3:: {
   Send "{F1}"
-  Sleep 800
+  Sleep 700
   Click 247, 455 ; 讨伐
   Sleep 50
   Click 474, 171 ; 全部
-  Sleep 20
+  Sleep 50
   Click 466, 357 ; 首领
+  Sleep 50
+  Click 797, 701 ; 滚动条
   Sleep 20
-  Click 725, 429 ; 纯水
-  Sleep 20
+  Click 797, 701 ; 滚动条
+  Sleep 150
+  Click 421, 364 ; 冰风
+  Sleep 1
   Click 1212, 700 ; 取消追踪
-  Sleep 88
+  Sleep 1
   Click 1212, 700 ; 追踪
-  Sleep 100
-  Click 38, 542 ; -
-  Sleep 180
-  Click 108, 535 ; 锚点
-  Sleep 80
+  Sleep 500
+  Click 1218, 364 ; 锚点
+  Sleep 50
   Click 1233, 839 ; 传送
+}
+; 打完拳皇传送2
+F5:: {
+  ; 全自动1
+  Send "{F1}"
+  Sleep 700
+  Click 247, 455 ; 讨伐
+  Sleep 50
+  Click 717, 592 ; 猊兽
+  Sleep 1
+  Click 1212, 700 ; 取消追踪
+  Sleep 1
+  Click 1212, 700 ; 追踪
+  Sleep 300
+  Click 995, 358 ; 锚点
+  Sleep 50
+  Click 1233, 839 ; 传送
+  ; 全自动2
+  ; Send "{F1}"
+  ; Sleep 400
+  ; Click 247, 455 ; 讨伐
+  ; Sleep 50
+  ; Click 474, 171 ; 全部
+  ; Sleep 1
+  ; Click 466, 357 ; 首领
+  ; Sleep 1
+  ; Click 725, 429 ; 纯水
+  ; Sleep 1
+  ; Click 1212, 700 ; 取消追踪
+  ; Sleep 1
+  ; Click 1212, 700 ; 追踪
+  ; Sleep 100
+  ; Click 38, 542 ; -
+  ; Sleep 100
+  ; Click 108, 535 ; 锚点
+  ; Sleep 80
+  ; Click 1233, 839 ; 传送
+  ; 半自动
   ; Send "m"
   ; Sleep 750
   ; Click 1029, 893, "Down"

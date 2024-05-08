@@ -4,12 +4,13 @@
     "description": "Server for YS-AHK",
     "main": "index.js",
     "scripts": {
-        "launch": "ts-node server.ts"
+        "serve": "ts-node server.ts"
     },
     "author": "YS-AHK",
     "license": "MIT",
     "dependencies": {
         "express": "^4.19.2",
+        "nanoid": "^3.3.7",
         "socket.io": "^4.7.5"
     },
     "devDependencies": {
