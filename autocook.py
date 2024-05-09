@@ -563,7 +563,7 @@ class GameControl:
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
-                self.AddUID(tpl.format(UID=text,MSG=self.lastReply))
+                self.AddUID(tpl.format(UID=text, MSG=self.lastReply))
         self.Click(1, 1)
 
     def UploadUIDAndCheckSign(self):

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=480px, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>自助餐</title>
         <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
         <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script>
@@ -14,7 +14,7 @@
                 <div class="menu-list flex-box w100">
                     <div class="menu-item player-name">
                         {{ roomId === "default"? "万民堂" : roomId }}
-                        <span style="font-size: 12px; color: #999">({{ onlineCount }} / {{ maxClient }}) ~{{ uidCount }}份</span>
+                        <span style="font-size: 12rem; color: #999">({{ onlineCount }} / {{ maxClient }}) ~{{ uidCount }}份</span>
                     </div>
                     <div class="menu-item flex-box">
                         <div class="username">{{player.name}}</div>
@@ -56,10 +56,10 @@
                         </li>
                     </ul>
                 </div>
-                <div class="flex-box">
+                <footer class="flex-box">
                     <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." @keyup.enter="addUid" />
                     <button type="button" class="ys-btn ml-0" @click="addUid">发送</button>
-                </div>
+                </footer>
                 <!-- <div class="uid-list">
                     <h2>历史记录</h2>
                     <ul>
@@ -102,7 +102,7 @@
             try {
                 if (localStorage.getItem("player")) formPlayer.value = player.value = JSON.parse(localStorage.getItem("player"))
             } catch (e) {}
-            const socket = io("/", { query: { room: roomId.value, user: player.value.name } })
+            const socket = player.value.name ? io("/", { query: { room: roomId.value, user: player.value.name } }) : {}
             const showSetting = ref(!player.value.name)
             const nowSeconds = ref(0)
             const uidList = ref([])
@@ -142,7 +142,7 @@
 
             const scrollToBottom = (force = false) => {
                 const list = document.querySelector(".msg-list")
-                if (list.scrollTop >= list.scrollHeight - list.clientHeight) {
+                if (list && list.scrollTop >= list.scrollHeight - list.clientHeight) {
                     Vue.nextTick(() => {
                         list.scrollTop = list.scrollHeight
                     })
@@ -151,20 +151,22 @@
             setTimeout(updateUidList, 1000)
             setInterval(updateUidList, 10000)
 
-            socket.on("connect", () => {
-                console.info("[socket.io] connected:", socket.id)
-            })
-            socket.on("disconnect", () => {
-                console.info("[socket.io] disconnected")
-            })
-            socket.on("update", (data) => {
-                console.info("[socket.io] update:", data)
-                updateData(data)
-                scrollToBottom()
-            })
-            socket.on("reload", () => {
-                location.reload()
-            })
+            if (socket.on) {
+                socket.on("connect", () => {
+                    console.info("[socket.io] connected:", socket.id)
+                })
+                socket.on("disconnect", () => {
+                    console.info("[socket.io] disconnected")
+                })
+                socket.on("update", (data) => {
+                    console.info("[socket.io] update:", data)
+                    updateData(data)
+                    scrollToBottom()
+                })
+                socket.on("reload", () => {
+                    location.reload()
+                })
+            }
 
             const formatTime = (time) => {
                 const diff = nowSeconds.value - time
@@ -308,24 +310,45 @@
         color: white;
         background-color: #212134;
     }
+
+    html {
+        font-size: 1px;
+    }
+    @media screen and (max-width: 420px) {
+        html {
+            font-size: 0.9px;
+        }
+    }
+    @media screen and (max-width: 380px) {
+        html {
+            font-size: 0.8px;
+        }
+    }
+    @media screen and (max-width: 320px) {
+        html {
+            font-size: 0.6px;
+        }
+    }
+
     * {
         box-sizing: border-box;
         list-style: none;
         padding: 0;
         margin: 0;
+        font-size: 14rem;
     }
     body::after {
         content: "";
         position: fixed;
         top: -0;
-        left: -10px;
-        right: -10px;
-        bottom: -10px;
+        left: -10rem;
+        right: -10rem;
+        bottom: -10rem;
         background-image: url("/bg.png");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        filter: blur(5px);
+        filter: blur(5rem);
         z-index: -1;
         opacity: 0.5;
     }
@@ -334,7 +357,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0 20px;
+        padding: 0 12rem;
         background-color: rgba(0, 0, 0, 0.5);
         position: fixed;
         top: 0;
@@ -342,52 +365,52 @@
         right: 0;
         z-index: 1;
         font-weight: bold;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 0 10rem rgba(0, 0, 0, 0.5);
     }
 
     .player-name {
-        font-size: 20px;
-        padding: 8px 24px;
+        font-size: 20rem;
+        padding: 8rem 24rem;
         background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
     }
 
     h2 {
         text-align: center;
-        font-size: 30px;
+        font-size: 30rem;
         font-weight: bold;
-        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        text-shadow: 1rem 1rem 3rem rgba(0, 0, 0, 0.1);
     }
 
     .welcome {
-        padding: 20px;
-        max-width: 800px;
-        margin: 60px auto;
+        padding: 20rem;
+        max-width: 800rem;
+        margin: 60rem auto;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 20px;
-        height: calc(100vh - 120px);
+        padding: 20rem;
+        height: calc(100vh - 120rem);
     }
 
     .ys-input {
-        height: 40px;
-        margin: 10px;
-        padding: 14px 18px;
-        font-size: 18px;
-        border: 2px solid #ccc;
-        border-radius: 50px;
+        height: 40rem;
+        margin: 10rem;
+        padding: 14rem 18rem;
+        font-size: 18rem;
+        border: 2rem solid #ccc;
+        border-radius: 50rem;
         font-weight: bold;
         background-color: rgba(0, 0, 0, 0);
         color: var(--ys-color-bright);
         transition: background 0.3s ease;
         transition-property: background, color;
-        box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 0 3rem rgba(0, 0, 0, 0.5);
     }
 
     .welcome .ys-btn,
     .welcome .ys-input {
-        width: calc(100% - 80px);
+        width: calc(100% - 80rem);
     }
 
     .ys-input::placeholder {
@@ -407,28 +430,28 @@
     .ys-btn-group {
         display: flex;
         justify-content: space-between;
-        width: calc(100% - 80px);
+        width: calc(100% - 80rem);
     }
     .ys-btn-group .ys-btn {
-        padding: 0 20px;
-        height: 40px;
-        margin: 10px 0;
+        padding: 0 20rem;
+        height: 40rem;
+        margin: 10rem 0;
         background-color: var(--ys-color-selected);
         border: none;
         border-radius: 0;
         box-shadow: none;
         color: var(--ys-color-selected-text);
-        border: 2px solid transparent;
+        border: 2rem solid transparent;
         transition: all 0.3s ease;
     }
     .ys-btn-group .ys-btn:first-child {
-        border-top-left-radius: 50px;
-        border-bottom-left-radius: 50px;
+        border-top-left-radius: 50rem;
+        border-bottom-left-radius: 50rem;
     }
 
     .ys-btn-group .ys-btn:last-child {
-        border-top-right-radius: 50px;
-        border-bottom-right-radius: 50px;
+        border-top-right-radius: 50rem;
+        border-bottom-right-radius: 50rem;
     }
     .ys-btn-group .ys-btn:hover {
         background-color: var(--ys-color-selected);
@@ -440,18 +463,18 @@
     }
 
     .ys-btn {
-        height: 40px;
-        margin: 10px;
-        padding: 4px 25px;
+        height: 40rem;
+        margin: 10rem;
+        padding: 4rem 25rem;
         background-color: var(--ys-color-primary);
-        font-size: 18px;
+        font-size: 18rem;
         cursor: pointer;
         color: var(--ys-color-selected);
         font-weight: bold;
         border: none;
-        border-radius: 50px;
+        border-radius: 50rem;
         transition: background 0.3s ease;
-        box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 0 8rem rgba(0, 0, 0, 0.2);
         text-wrap: nowrap;
     }
     .ys-btn:hover {
@@ -460,21 +483,25 @@
     .ys-btn:active {
         opacity: 0.7;
         color: white;
-        box-shadow: 0 0 10px var(--ys-color-primary);
+        box-shadow: 0 0 10rem var(--ys-color-primary);
     }
 
     .ys-list-item {
-        border: 2px solid var(--ys-color-primary);
-        border-radius: 50px;
-        padding: 0px 20px;
-        margin-bottom: 10px;
+        border: 2rem solid var(--ys-color-primary);
+        border-radius: 50rem;
+        padding: 0rem 20rem;
+        margin-bottom: 10rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
         background-color: var(--ys-color-primary);
         transition: all 0.3s ease;
-        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
+        box-shadow: 1rem 1rem 3rem rgba(0, 0, 0, 0.05);
         position: relative;
+    }
+
+    .ys-list-item:last-child {
+        margin-bottom: 0;
     }
 
     .ys-list-item:nth-child(odd) {
@@ -487,56 +514,63 @@
     .ys-list-item:hover {
         background-color: var(--ys-color-selected-text);
         transform: scale(1.03);
-        box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.3);
+        box-shadow: 1rem 1rem 5rem rgba(0, 0, 0, 0.3);
     }
 
     .uid-list ul {
-        margin: 1rem 2rem;
+        margin: 10rem 8rem;
         position: relative;
     }
     .ys-list-item .content {
-        margin-left: 10px;
-        font-size: 18px;
+        margin-left: 10rem;
+        font-size: 18rem;
         color: var(--ys-color-dark);
         font-weight: bold;
         pointer-events: none;
         font-family: ui-monospace;
-        text-shadow: 0px 0px 3px white, 0px 0px 2px white;
+        text-shadow: 0rem 0rem 3rem white, 0rem 0rem 2rem white;
     }
     .ys-list-item .uid {
-        font-size: 14px;
+        font-size: 14rem;
     }
     .ys-list-item .time {
-        font-size: 14px;
+        font-size: 14rem;
         color: var(--ys-color-tip);
         font-weight: bold;
         pointer-events: none;
         user-select: none;
-        text-shadow: 0px 0px 3px white, 0px 0px 2px white;
+        text-shadow: 0rem 0rem 3rem white, 0rem 0rem 2rem white;
         position: absolute;
-        left: 180px;
-        bottom: 10px;
+        left: 180rem;
+        bottom: 10rem;
     }
 
+    footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
     .msg-list {
-        overflow-y: scroll;
-        border-top: 2px solid var(--ys-color-primary);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 60rem;
     }
     .msg-list::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 8rem;
+        height: 8rem;
     }
     .msg-list::-webkit-scrollbar-thumb {
         background-color: var(--ys-color-selected-text);
-        border-radius: 10px;
+        border-radius: 10rem;
     }
     .msg-list::-webkit-scrollbar-track {
         background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(217, 211, 201, 0.5), rgba(217, 211, 201, 0.5), rgba(0, 0, 0, 0));
-        border-radius: 10px;
+        border-radius: 10rem;
     }
     .ys-msg-item {
-        margin: 8px 20px;
-        padding: 8px 4px;
+        margin: 8rem 20rem;
+        padding: 8rem 4rem;
         display: flex;
         align-items: center;
         position: relative;
@@ -544,51 +578,52 @@
     }
     .ys-msg-item .time {
         position: absolute;
-        right: 10px;
-        top: 10px;
-        font-size: 16px;
-        height: 20px;
-        line-height: 20px;
+        right: 10rem;
+        top: 10rem;
+        font-size: 14rem;
+        height: 20rem;
+        line-height: 20rem;
         color: #cecdd1;
     }
     .ys-msg-item .user {
-        font-size: 16px;
+        font-size: 16rem;
         color: #cecdd1;
-        margin-left: 20px;
-        height: 20px;
-        line-height: 20px;
+        margin-left: 20rem;
+        height: 20rem;
+        line-height: 20rem;
         overflow: hidden;
-        text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.3);
-        margin-bottom: 4px;
+        text-shadow: 0rem 0rem 2rem rgba(0, 0, 0, 0.3);
+        margin-bottom: 4rem;
     }
     .ys-msg-item .text {
-        font-size: 20px;
+        font-size: 20rem;
         color: var(--ys-color-bright);
         background: var(--ys-color-text);
-        padding: 12px 20px;
-        border-radius: 25px;
-        margin-left: 14px;
+        padding: 12rem 20rem;
+        border-radius: 25rem;
+        margin-left: 14rem;
         position: relative;
-        filter: drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.3));
+        filter: drop-shadow(1rem 1rem 3rem rgba(0, 0, 0, 0.3));
         word-break: break-word;
     }
     .ys-msg-item .text::before {
         position: absolute;
-        left: -18px;
-        top: 1px;
+        left: -18rem;
+        top: 1rem;
         content: "";
         width: 0;
         height: 0;
-        border: 10px solid transparent;
-        border-right-width: 14px;
+        border: 10rem solid transparent;
+        border-right-width: 14rem;
         border-right-color: var(--ys-color-text);
         transform: rotate(27deg);
     }
     .ys-msg-item .banner {
         text-align: center;
         background-color: rgba(67, 87, 50, 0.5);
-        border-radius: 5px;
-        padding: 4px 16px;
+        border-radius: 5rem;
+        padding: 4rem 16rem;
+        font-size: 12rem;
     }
     .ys-msg-item .banner + .flex-1 {
         display: none;
@@ -610,7 +645,7 @@
     .list-enter-from,
     .list-leave-to {
         opacity: 0;
-        transform: translateX(400px);
+        transform: translateX(400rem);
     }
 
     .vertical-box {
@@ -618,10 +653,9 @@
         flex-direction: column;
         align-items: stretch;
         justify-content: space-between;
-        height: calc(100vh - 60px);
         width: 100%;
         position: absolute;
-        top: 60px;
+        top: 60rem;
         left: 0;
         right: 0;
         bottom: 0;
