@@ -55,7 +55,6 @@ class Room {
             return true
         }
         this.onlineUsers[user] = { ref: 1, time: Math.floor(Date.now() / 1000) }
-        console.log("join", this.msgs.slice(-2))
         this.msgs = [
             ...this.msgs.filter((item) => item.user !== user || item.text !== "<enter>").slice(-19),
             {
@@ -73,7 +72,6 @@ class Room {
             this.onlineUsers[user].ref--
             if (this.onlineUsers[user].ref <= 0) {
                 delete this.onlineUsers[user]
-                console.log("leave", this.msgs.slice(-2))
                 this.msgs = [
                     ...this.msgs.filter((item) => item.user !== user || item.text !== "<leave>").slice(-19),
                     {
@@ -223,8 +221,9 @@ app.get("/uid", (req, res) => {
 app.get("/add/:uid", (req, res) => {
     const room = Room.getRoom()!
     let uid = req.params.uid.replace(/[,<>\s%&]/g, "")
-    room.addUid(uid)
-    io.emit("update", room.toJSON())
+    const cooker = (typeof req.query.cooker === "string" && req.query.cooker) || "[bot]"
+    room.addUid(uid, cooker)
+    io.to(room.id).emit("update", room.toJSON())
     return cors(res).send(room.uidList.map((v) => v.uid).join())
 })
 
@@ -260,8 +259,9 @@ app.get("/r/:room/uid", (req, res) => {
 app.get("/r/:room/add/:uid", (req, res) => {
     const room = Room.getRoom(req.params.room)!
     let uid = req.params.uid.replace(/[,<>\s%&]/g, "")
-    room.addUid(uid)
-    io.emit("update", room.toJSON())
+    const cooker = (typeof req.query.cooker === "string" && req.query.cooker) || "[bot]"
+    room.addUid(uid, cooker)
+    io.to(room.id).emit("update", room.toJSON())
     return cors(res).send(room.uidList.map((v) => v.uid).join())
 })
 

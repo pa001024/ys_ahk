@@ -22,16 +22,26 @@ config = configparser.ConfigParser()
 config.read("autocook.ini", encoding="utf-8")
 
 cfg_endpoint = config.get("cook", "endpoint")
+if cfg_endpoint.endswith("/"):
+    cfg_endpoint = cfg_endpoint[:-1]
+cfg_cooker = config.get("cook", "cooker")
 cfg_checkmap = config.getint("cook", "checkmap")
 cfg_entermsg = config.get("cook", "entermsg")
 cfg_enteremo = config.getint("cook", "enteremo")
+cfg_successpattern = config.get("cook", "successpattern")
 cfg_successmsg = config.get("cook", "successmsg")
 cfg_successemo = config.getint("cook", "successemo")
+cfg_exitpattern = config.get("cook", "exitpattern")
 cfg_exitmsg = config.get("cook", "exitmsg")
 cfg_exitemo = config.getint("cook", "exitemo")
-cfg_timeout = config.getint("cook", "timeout")
-cfg_timeoutmsg = config.get("cook", "timeoutmsg")
-cfg_timeoutemo = config.getint("cook", "timeoutemo")
+cfg_timeout_noreply_wait = config.getint("cook", "timeout_noreply_wait")
+cfg_timeout_noreply_msg = config.get("cook", "timeout_noreply_msg")
+cfg_timeout_noreply_emo = config.getint("cook", "timeout_noreply_emo")
+cfg_timeout_noreply_sign_pattern = config.get("cook", "timeout_noreply_sign_pattern")
+cfg_timeout_reply_wait = config.getint("cook", "timeout_reply_wait")
+cfg_timeout_reply_msg = config.get("cook", "timeout_reply_msg")
+cfg_timeout_reply_emo = config.getint("cook", "timeout_reply_emo")
+cfg_timeout_reply_add_fmt = config.get("cook", "timeout_reply_add_fmt")
 
 
 # 识别数字
@@ -388,30 +398,35 @@ class GameControl:
 
     def AutoCheckMap(self, teleport=False):
         with console.status("[red]AutoCheckMap"):
-            self.EnterMap()
-            self.Click(1532, 846)
-            time.sleep(0.2)
-            self.Click(1272, 327)
-            self.WaitState("map")
-            for _ in range(100):
-                mouse.scroll(0, 1)
-            for _ in range(3):
-                self.Click(39, 545)
-                time.sleep(0.02)
+            self.EnterMain()
+            time.sleep(1)
+            pg.press("f1")
+            time.sleep(1)
+            self.Click(240, 452)  # 讨伐
+            time.sleep(0.1)
+            self.Click(480, 170)  # 全部
+            time.sleep(0.1)
+            self.Click(499, 364)  # 首领
+            time.sleep(0.1)
+            self.Click(797, 693)  # 滚动条
             time.sleep(0.3)
-            for _ in range(4):
-                mouse.scroll(0, -1)
-                time.sleep(0.2)
-            (x, y) = self.PixelSearch(1438, 381, 1492, 432, (0xBA, 0xBA, 0xBC), 0.04)
-            if teleport and x is not None:
-                self.Click(x, y)
-                self.WaitColor(1080, 618, "FFFFFF")
-                self.Click(1080, 610)
-                time.sleep(0.3)
+            self.Click(797, 693)  # 滚动条
+            time.sleep(0.3)
+            self.Click(419, 361)  # 冰风
+            time.sleep(0.1)
+            self.Click(1205, 699)  # 追踪
+            time.sleep(0.1)
+            self.Click(1205, 699)  # 追踪
+            self.WaitState("map")
+            time.sleep(0.5)
+            rst = self.CheckColor(1219, 367, "E.E.E.")
+            if rst and teleport:
+                self.Click(1219, 367)
+                time.sleep(0.1)
                 self.Click(1227, 839)
                 time.sleep(0.2)
-        console.log(f"[green]AutoCheckMap: [green]{x is not None}")
-        return x is not None
+        console.log(f"[green]AutoCheckMap: [green]{rst}")
+        return rst
 
     def AutoExit(self):
         console.log("[red]AutoExit")
@@ -420,13 +435,9 @@ class GameControl:
             self.Click(1305, 845)
 
     replyGroups = [
-        [r"^不$|不行|不可以|不能|no|shg|珊瑚宫|留着|四连|-6|刚打过了", cfg_exitmsg, "exit"],
-        [
-            r"^[好哦嗯可行来进走去]无所谓|都[行好可]|好[的把吧啊]|自[便取]|[打请][便打把吧呗]|打$|随[遍便意]|^1|冲冲冲|申请|well|go|^o$|欧克|阔以|可以|彳[亍于]|ok|^hao|keyi|ky|一起|没问题|当然|欢迎",
-            cfg_successmsg,
-            "success",
-        ],
-        [r"怎么打|材料|几只|什么|啥|哪个|那个|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
+        [cfg_exitpattern, cfg_exitmsg, "exit"],
+        [cfg_successpattern, cfg_successmsg, "success"],
+        [r"[那哪][三3]?个|说说看|怎么打|材料|几只|什么|啥|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
         [r"为什么|怎么不|干[嘛吗]", "这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~", "idle"],
         [r"帮我|^帮", "要帮忙的话可以让他们帮哦~~", "idle"],
         [r"要帮忙[嘛吗]", "不麻烦你了，让他们自己去吧~~", "idle"],
@@ -438,6 +449,7 @@ class GameControl:
     ]
 
     inputSet = set()
+    lastReply = ""
     replySet = set()
     okimg = cv2.imread("ok.png")
 
@@ -495,6 +507,7 @@ class GameControl:
                     y = Py + 119
                     continue
                 self.inputSet.add(text)
+                self.lastReply = text
                 console.log(f"[green]RecognizeText [green]({x},{y}): {text}")
                 for pattern, reply, action in self.replyGroups:
                     if re.search(pattern, text, re.IGNORECASE):
@@ -522,8 +535,24 @@ class GameControl:
             y = Py + 119
         return False
 
-    def UploadUID(self):
-        console.status("[green]UploadUID")
+    def GetUIDList(self):
+        try:
+            res = requests.get(f"{cfg_endpoint}/list")
+        except requests.exceptions.RequestException:
+            return []
+        return res.text.split(",")
+
+    def AddUID(self, uid, cooker=cfg_cooker):
+        for _ in range(3):
+            try:
+                requests.get(f"{cfg_endpoint}/add/{uid}?cooker={cooker}")
+            except requests.exceptions.RequestException:
+                console.log("[red]上传UID失败")
+                continue
+            break
+
+    def UploadUID(self, tpl="{UID}"):
+        # console.log("[green]UploadUID")
         self.EnterF2()
         self.Click(279, 179)
         self.WaitColor(421, 166, "DAD5CB")
@@ -534,21 +563,27 @@ class GameControl:
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
-                for _ in range(3):
-                    try:
-                        requests.get(f"{cfg_endpoint}add/{text}")
-                    except requests.exceptions.RequestException:
-                        console.log("[red]上传UID失败")
-                        continue
-                    break
+                self.AddUID(tpl.format(UID=text,MSG=self.lastReply))
         self.Click(1, 1)
 
-    def GetUIDList(self):
-        try:
-            res = requests.get(f"{cfg_endpoint}list")
-        except requests.exceptions.RequestException:
-            return []
-        return res.text.split(",")
+    def UploadUIDAndCheckSign(self):
+        # console.log("[green]UploadUIDAndSign")
+        self.EnterF2()
+        self.Click(279, 179)
+        self.WaitColor(421, 166, "DAD5CB")
+        self.Click(421, 166)
+        self.WaitColor(537, 457, "A7B982")
+        (x, y) = self.toScreenPos(518, 164)
+        text = OCRNumber((x, y, x + 106 * self.w // 1600, y + 19 * self.h // 900))
+        if text:
+            console.log(f"[green]UID：[yellow]{text}")
+            if re.match(r"^\d{9}$", text):
+                img = ImageGrab.grab((360, 535, 733, 559))
+                img = np.array(img)
+                sign = self.RecognizeText(img)
+                if re.match(cfg_timeout_noreply_sign_pattern, sign):
+                    self.AddUID(text, "[挂]" + cfg_cooker)
+        self.Click(1, 1)
 
     def AutoCook(self):
         console.log("[green]AutoCook")
@@ -561,24 +596,37 @@ class GameControl:
         self.EnterChat()
         time.sleep(2)
         if cfg_entermsg:
-            reply_text = re.sub(r"\{TIME\}", getTimeStr(), cfg_entermsg)
+            reply_text = cfg_entermsg.format(TIME=getTimeStr())
             self.AutoChat(reply_text, auto_exit=False)
             time.sleep(3)
         if cfg_enteremo:
             self.AutoEmo(cfg_enteremo, auto_exit=False)
         start_time = time.time()
-        wait_time = cfg_timeout
+        wait_time = cfg_timeout_noreply_wait
         self.inputSet = set()
         self.replySet = set()
+        self.lastReply = ""
         with console.status("[red]AutoReply"):
-            while self.isForeground() and time.time() - start_time < wait_time:
+            while self.isForeground() and (wait_time == 0 or time.time() - start_time < wait_time):
                 if self.AutoReply():
                     return True
+                if len(self.inputSet):
+                    wait_time = cfg_timeout_reply_wait
                 time.sleep(1)
-        if cfg_timeoutmsg:
-            self.AutoChat(cfg_timeoutmsg, auto_exit=False)
-        if cfg_timeoutemo:
-            self.AutoEmo(cfg_timeoutemo, auto_exit=False)
+        if len(self.inputSet):
+            if cfg_timeout_reply_msg:
+                self.AutoChat(cfg_timeout_noreply_msg, auto_exit=False)
+            if cfg_timeout_reply_emo:
+                self.AutoEmo(cfg_timeout_noreply_emo, auto_exit=False)
+            if cfg_timeout_reply_add_fmt:
+                self.UploadUID(cfg_timeout_reply_add_fmt)
+        else:
+            if cfg_timeout_noreply_msg:
+                self.AutoChat(cfg_timeout_noreply_msg, auto_exit=False)
+            if cfg_timeout_noreply_emo:
+                self.AutoEmo(cfg_timeout_noreply_emo, auto_exit=False)
+            if cfg_timeout_noreply_sign_pattern:
+                self.UploadUIDAndCheckSign()
 
         self.AutoExit()
         return False
