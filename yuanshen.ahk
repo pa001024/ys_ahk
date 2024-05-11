@@ -104,7 +104,7 @@ CapsLock & 4:: {
 ; 传送利亚姆
 F3:: {
   Send "{F1}"
-  Sleep 700
+  Sleep 800
   Click 247, 455 ; 讨伐
   Sleep 50
   Click 474, 171 ; 全部
@@ -112,15 +112,15 @@ F3:: {
   Click 466, 357 ; 首领
   Sleep 50
   Click 797, 701 ; 滚动条
-  Sleep 20
+  Sleep 50
   Click 797, 701 ; 滚动条
-  Sleep 150
+  Sleep 300
   Click 421, 364 ; 冰风
   Sleep 1
   Click 1212, 700 ; 取消追踪
   Sleep 1
   Click 1212, 700 ; 追踪
-  Sleep 500
+  Sleep 600
   Click 1218, 364 ; 锚点
   Sleep 50
   Click 1233, 839 ; 传送
@@ -129,7 +129,7 @@ F3:: {
 F5:: {
   ; 全自动1
   Send "{F1}"
-  Sleep 700
+  Sleep 800
   Click 247, 455 ; 讨伐
   Sleep 50
   Click 717, 592 ; 猊兽

@@ -615,9 +615,9 @@ class GameControl:
                 time.sleep(1)
         if len(self.inputSet):
             if cfg_timeout_reply_msg:
-                self.AutoChat(cfg_timeout_noreply_msg, auto_exit=False)
+                self.AutoChat(cfg_timeout_reply_msg, auto_exit=False)
             if cfg_timeout_reply_emo:
-                self.AutoEmo(cfg_timeout_noreply_emo, auto_exit=False)
+                self.AutoEmo(cfg_timeout_reply_emo, auto_exit=False)
             if cfg_timeout_reply_add_fmt:
                 self.UploadUID(cfg_timeout_reply_add_fmt)
         else:

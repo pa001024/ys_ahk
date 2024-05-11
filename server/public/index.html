@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>自助餐</title>
         <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
-        <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script>
+        <!-- <script src="https://cdn.staticfile.net/socket.io/4.7.4/socket.io.min.js"></script> -->
     </head>
 
     <body>
@@ -14,7 +14,7 @@
                 <div class="menu-list flex-box w100">
                     <div class="menu-item player-name">
                         {{ roomId === "default"? "万民堂" : roomId }}
-                        <span style="font-size: 12rem; color: #999">({{ onlineCount }} / {{ maxClient }}) ~{{ uidCount }}份</span>
+                        <span style="font-size: 12rem; color: #999">({{ room.clientCount }} / {{ room.maxClient }}) ~{{ room.count }}份</span>
                     </div>
                     <div class="menu-item flex-box">
                         <div class="username">{{player.name}}</div>
@@ -25,30 +25,53 @@
             <article v-if="!showSetting" class="public-room vertical-box">
                 <div class="uid-list">
                     <transition-group name="list" tag="ul">
-                        <li class="ys-list-item" v-for="(uid, index) in uidList" :key="uid.uid">
+                        <li
+                            class="ys-list-item"
+                            v-for="activity in room.activities"
+                            :key="activity.id"
+                            :class="{ active: activity.users.includes(player.name)}"
+                            @click="activity.users.includes(player.name) && copyText(activity.uid)"
+                        >
+                            <div class="content">
+                                <div class="cooker">
+                                    <div class="tag joined" v-if="activity.users.includes(player.name)">已加入</div>
+                                    <div class="tag" v-else>已开始</div>
+                                    {{ activity.owner }}
+                                </div>
+                                <div class="uid">UID: {{ activity.uid }}</div>
+                            </div>
+                            <div class="time">⏳{{ formatTime(activity.time) }}</div>
+                            <div class="box">
+                                <div class="num">{{ activity.users.length + 1 }} / 4</div>
+                                <button type="button" class="ys-btn" :disabled="!activity.users.includes(player.name) && !(!activity.req || activity.req & player.flag)" @click.stop="addActivity(activity.id)">
+                                    {{ activity.owner === player.name ? "结束": "加入" }}
+                                </button>
+                            </div>
+                        </li>
+                        <li class="ys-list-item" v-for="uid in room.current" :key="uid.id">
                             <div class="content">
                                 <div class="cooker">{{ uid.cooker }}</div>
-                                <div class="uid">UID: {{ maskUid(uid.uid) }}</div>
+                                <div class="uid">UID: {{ uid.uid }}</div>
                             </div>
                             <div class="time">⏳{{ formatTime(uid.cookTime) }}</div>
-                            <button type="button" class="ys-btn" @click.stop="removeUid(index)">拿走</button>
+                            <button type="button" class="ys-btn" @click.stop="addActivity(uid.id)">匹配</button>
                         </li>
                     </transition-group>
-                    <!-- <p v-if="!uidList.length">饭吃完了，新饭马上端上来</p> -->
                 </div>
                 <div class="msg-list flex-1">
                     <ul>
                         <li class="ys-msg-item" :key="msg.id" v-for="(msg, index) in mixMsgList()" :key="msg.id">
                             <div class="content banner" v-if="msg.cookTime">
-                                <div class="tip">{{ msg.user }}拿走了{{ maskUid(msg.uid) }}</div>
+                                <div class="tip" v-if="msg.user !== msg.cooker">{{ renderUserName(msg.user) }}使用了{{ msg.cooker }}的{{ msg.uid }}</div>
+                                <div class="tip" v-else>{{ renderUserName(msg.user) }}开始匹配{{ msg.uid }}</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
                             <div class="content banner" v-else-if="translateTag(msg.text) !== msg.text">
-                                <div class="tip">{{ msg.user }}{{ translateTag(msg.text) }}了房间</div>
+                                <div class="tip">{{ renderUserName(msg.user) }}{{ translateTag(msg.text) }}了房间</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
                             <div class="content" v-else>
-                                <div class="user">{{ msg.user }}</div>
+                                <div class="user">{{ renderUserName(msg.user) }}</div>
                                 <div class="text">{{ msg.text }}</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
@@ -56,19 +79,10 @@
                         </li>
                     </ul>
                 </div>
-                <footer class="flex-box">
-                    <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." @keyup.enter="addUid" />
-                    <button type="button" class="ys-btn ml-0" @click="addUid">发送</button>
-                </footer>
-                <!-- <div class="uid-list">
-                    <h2>历史记录</h2>
-                    <ul>
-                        <li class="history-item" v-for="(item, index) in uidHistory" :key="index" @click="copyText(item.uid)">
-                            <label>{{ item.uid }}</label>
-                            <span>{{ formatTimeDiff(nowSeconds - item.time) }}</span>
-                        </li>
-                    </ul>
-                </div> -->
+                <form @submit.prevent="addUid" class="flex-box msg-form">
+                    <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." />
+                    <button type="submit" class="ys-btn ml-0">发送</button>
+                </form>
             </article>
             <article v-else class="welcome">
                 <div class="ys-btn-group">
@@ -77,10 +91,10 @@
                 </div>
                 <input class="ys-input" type="text" v-model="formPlayer.name" placeholder="请输入昵称" />
                 <div class="ys-btn-group" v-if="formRoomType === 'public'">
-                    <button type="button" class="ys-btn" :class="{ checked: 1 & formPlayer.flag }" @click="formPlayer.flag = 1 ^ formPlayer.flag">有C</button>
-                    <button type="button" class="ys-btn" :class="{ checked: 2 & formPlayer.flag }" @click="formPlayer.flag = 2 ^ formPlayer.flag">有芙</button>
-                    <button type="button" class="ys-btn" :class="{ checked: 4 & formPlayer.flag }" @click="formPlayer.flag = 4 ^ formPlayer.flag">有万</button>
-                    <button type="button" class="ys-btn" :class="{ checked: 8 & formPlayer.flag }" @click="formPlayer.flag = 8 ^ formPlayer.flag">会淹</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 1 & formPlayer.flag }" @click="formPlayer.flag = 1 ^ formPlayer.flag">龙</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 2 & formPlayer.flag }" @click="formPlayer.flag = 2 ^ formPlayer.flag">芙</button>
+                    <button type="button" class="ys-btn" :class="{ checked: 4 & formPlayer.flag }" @click="formPlayer.flag = 4 ^ formPlayer.flag">万</button>
+                    <!-- <button type="button" class="ys-btn" :class="{ checked: 8 & formPlayer.flag }" @click="formPlayer.flag = 8 ^ formPlayer.flag">淹</button> -->
                 </div>
                 <input v-if="formRoomType === 'private'" class="ys-input" type="text" v-model="formRoomId" placeholder="房间号" />
                 <button type="button" class="ys-btn" @click="joinRoom">加入</button>
@@ -92,6 +106,59 @@
     const { createApp, ref, watch } = Vue
 
     const baseURL = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/"
+
+    function io(roomId, playerName) {
+        class ioClient {
+            constructor(roomId, playerName) {
+                this.reconnect(roomId, playerName)
+            }
+            reconnect(roomId, playerName) {
+                if (this.ws) this.ws.close()
+                this.ws = new WebSocket(`ws://${location.host}/ws/?room=${roomId}&user=${playerName}`)
+                this.ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data)
+                    if (data.event) {
+                        this.ws.dispatchEvent(new CustomEvent(data.event, { detail: data }))
+                    }
+                }
+                this.ws.onclose = () => {
+                    console.info("[io] disconnected")
+                    setTimeout(() => {
+                        this.reconnect(roomId, playerName)
+                    }, 1)
+                }
+                this.on("joined", (id) => {
+                    this.id = id
+                    console.info("[io] connected:", id)
+                })
+                this.events.pop()
+                this.events.forEach(({ event, handler }) => {
+                    this.ws.addEventListener(event, handler)
+                })
+            }
+            emit(event, data) {
+                this.ws.send(JSON.stringify({ event, data }))
+            }
+            events = []
+            on(event, callback) {
+                let handler = (event) => {
+                    callback(event.detail.data)
+                }
+                this.events.push({ event, handler })
+                this.ws.addEventListener(event, handler)
+            }
+            wait(event) {
+                return new Promise((resolve) => {
+                    const handler = (e) => {
+                        resolve(e.detail.data)
+                        this.ws.removeEventListener(event, handler)
+                    }
+                    this.ws.addEventListener(event, handler)
+                })
+            }
+        }
+        return new ioClient(roomId, playerName)
+    }
     createApp({
         setup() {
             const roomId = ref((location.pathname.match(/\/[A-Za-z0-9]+$/) || "/")[0].substr(1) || "default")
@@ -102,16 +169,14 @@
             try {
                 if (localStorage.getItem("player")) formPlayer.value = player.value = JSON.parse(localStorage.getItem("player"))
             } catch (e) {}
-            const socket = player.value.name ? io("/", { query: { room: roomId.value, user: player.value.name } }) : {}
+            const socket = player.value.name ? io(roomId.value, player.value.name) : {}
             const showSetting = ref(!player.value.name)
-            const nowSeconds = ref(0)
-            const uidList = ref([])
-            const uidHistory = ref([])
+            const nowSeconds = ref(~~(Date.now() / 1000))
+            setInterval(() => {
+                nowSeconds.value = ~~(Date.now() / 1000)
+            }, 1e3)
             const newUid = ref("")
-            const uidCount = ref(0)
-            const onlineCount = ref(0)
-            const maxClient = ref(0)
-            const msgList = ref([])
+            const room = ref({ current: [], history: [], msgs: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
             const translateTag = (tag) => {
                 const table = {
                     "<enter>": "进入",
@@ -120,13 +185,19 @@
                 return table[tag] || tag
             }
             const updateData = (data) => {
-                console.log(data)
-                uidList.value = data.current
-                uidHistory.value = data.history
-                uidCount.value = data.count
-                msgList.value = data.msgs
-                onlineCount.value = data.clientCount
-                maxClient.value = data.maxClient
+                Object.assign(room.value, data)
+                if (data.activities) {
+                    // 需要从当前列表中删除已开始的活动
+                    const inact = room.value.current.filter((item) => data.activities.some((act) => act.id == item.id))
+                    if (inact.length) {
+                        room.value.current = room.value.current.filter((item) => !inact.some((act) => act.id == item.id))
+                        room.value.history = [
+                            //
+                            ...room.value.history.filter((item) => !inact.some((act) => act.id == item.id)),
+                            ...inact.map((act) => ({ ...act, user: act.owner, time: ~~(Date.now() / 1000) })),
+                        ]
+                    }
+                }
             }
             const updateUidList = async () => {
                 if (socket.id) return
@@ -136,9 +207,7 @@
                 scrollToBottom(true)
             }
 
-            const mixMsgList = () => {
-                return [...uidHistory.value, ...msgList.value].sort((a, b) => a.time - b.time)
-            }
+            const mixMsgList = () => [...room.value.history, ...room.value.msgs].sort((a, b) => a.time - b.time)
 
             const scrollToBottom = (force = false) => {
                 const list = document.querySelector(".msg-list")
@@ -153,13 +222,13 @@
 
             if (socket.on) {
                 socket.on("connect", () => {
-                    console.info("[socket.io] connected:", socket.id)
+                    console.info("[io] connected:", socket.id)
                 })
                 socket.on("disconnect", () => {
-                    console.info("[socket.io] disconnected")
+                    console.info("[io] disconnected")
                 })
                 socket.on("update", (data) => {
-                    console.info("[socket.io] update:", data)
+                    console.info("[io] update:", data)
                     updateData(data)
                     scrollToBottom()
                 })
@@ -177,12 +246,7 @@
                 const second = diff % 60
                 return `${minute}分${second}秒前`
             }
-            const updateTime = () => {
-                nowSeconds.value = ~~(Date.now() / 1000)
-            }
-            updateTime()
-            setInterval(updateTime, 1000)
-
+            const renderUserName = (user) => (user !== player.value.name ? user : "你")
             const joinRoom = async () => {
                 const rt = formRoomType.value
                 const fp = formPlayer.value
@@ -220,12 +284,12 @@
             }
             const removeUid = async (index) => {
                 try {
-                    await copyText(uidList.value[index].uid)
+                    await copyText(room.value.current[index].uid)
                 } catch (e) {
                     if (!confirm("复制失败，确认要删除吗？")) return
                 }
-                const uid = uidList.value.splice(index, 1)
-                uidHistory.value.unshift({ uid: uid[0].uid, time: uid[0].time })
+                const uid = room.value.current.splice(index, 1)
+                room.value.history.unshift({ uid: uid[0].uid, time: uid[0].time })
                 if (socket.id) {
                     socket.emit("del_uid", uid[0].uid)
                 } else {
@@ -236,17 +300,15 @@
                 if (newUid.value.trim()) {
                     const text = newUid.value.trim()
                     if (/^\d{9}$/.test(text)) {
-                        if (uidList.value.includes(text)) return
-                        if (uidHistory.value.some((item) => item.uid == text)) {
-                            uidHistory.value.splice(
-                                uidHistory.value.find((item) => item.uid == text),
+                        if (room.value.current.includes(text)) return
+                        if (room.value.history.some((item) => item.uid == text)) {
+                            room.value.history.splice(
+                                room.value.history.find((item) => item.uid == text),
                                 1
                             )
                         }
-                        uidList.value.push({ uid: text, time: nowSeconds.value })
-                        uidCount.value += 1
                     } else {
-                        msgList.value.push({
+                        room.value.msgs.push({
                             id: Math.random().toString(36).substr(3),
                             user: player.value.name,
                             text,
@@ -262,8 +324,26 @@
                     newUid.value = ""
                 }
             }
-            const maskUid = (uid) => {
-                return uid.slice(0, 3) + "***" + uid.slice(6)
+            const addActivity = async (id) => {
+                const act = room.value.activities.find((item) => item.id == id)
+                if (act) {
+                    if (act.owner === player.value.name) {
+                        socket.emit("del_act", { id })
+                        return
+                    }
+                    if (act.users.includes(player.value.name)) {
+                        copyText(act.uid)
+                        return
+                    }
+                }
+                if (socket.id) {
+                    socket.emit("add_act", { id, flag: player.value.flag })
+                    const act = await socket.wait("act_ok")
+                    copyText(act.uid)
+                } else {
+                    await fetch(baseURL + "act/" + id)
+                }
+                return
             }
             return {
                 roomId,
@@ -273,22 +353,17 @@
                 formPlayer,
                 player,
                 nowSeconds,
-                uidList,
-                uidHistory,
+                room,
                 newUid,
-                uidCount,
                 joinRoom,
                 removeUid,
                 copyText,
                 addUid,
-                newUid,
                 formatTime,
-                onlineCount,
-                msgList,
-                maskUid,
                 mixMsgList,
                 translateTag,
-                maxClient,
+                addActivity,
+                renderUserName,
             }
         },
     }).mount("#app")
@@ -486,6 +561,12 @@
         box-shadow: 0 0 10rem var(--ys-color-primary);
     }
 
+    .ys-btn[disabled] {
+        pointer-events: none;
+        user-select: none;
+        opacity: 0.5;
+    }
+
     .ys-list-item {
         border: 2rem solid var(--ys-color-primary);
         border-radius: 50rem;
@@ -498,6 +579,19 @@
         transition: all 0.3s ease;
         box-shadow: 1rem 1rem 3rem rgba(0, 0, 0, 0.05);
         position: relative;
+    }
+
+    .tag {
+        border-radius: 5rem;
+        padding: 2rem 8rem;
+        font-size: 14rem;
+        background-color: rgba(29, 121, 26, 0.5);
+        color: var(--ys-color-bright);
+        display: inline-block;
+        text-shadow: 0rem 0rem 2rem rgba(0, 0, 0, 0.3);
+    }
+    .tag.joined {
+        background-color: rgba(102, 105, 255, 0.5);
     }
 
     .ys-list-item:last-child {
@@ -516,7 +610,9 @@
         transform: scale(1.03);
         box-shadow: 1rem 1rem 5rem rgba(0, 0, 0, 0.3);
     }
-
+    .ys-list-item.active {
+        cursor: pointer;
+    }
     .uid-list ul {
         margin: 10rem 8rem;
         position: relative;
@@ -544,8 +640,24 @@
         left: 180rem;
         bottom: 10rem;
     }
+    .ys-list-item .box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+    .ys-list-item .box .ys-btn {
+        margin-top: 2rem;
+    }
+    .ys-list-item .num {
+        margin-top: 2rem;
+        font-weight: bold;
+        font-size: 14rem;
+        color: var(--ys-color-text);
+    }
 
-    footer {
+    .msg-form {
         position: fixed;
         bottom: 0;
         left: 0;

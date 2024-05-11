@@ -1,20 +1,17 @@
 {
-    "name": "server",
-    "version": "1.0.0",
-    "description": "Server for YS-AHK",
-    "main": "index.js",
-    "scripts": {
-        "serve": "ts-node server.ts"
-    },
-    "author": "YS-AHK",
-    "license": "MIT",
-    "dependencies": {
-        "express": "^4.19.2",
-        "nanoid": "^3.3.7",
-        "socket.io": "^4.7.5"
-    },
-    "devDependencies": {
-        "@types/express": "^4.17.21",
-        "ts-node": "^10.9.2"
-    }
+  "name": "server",
+  "version": "1.0.50",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/static": "^1.0.3",
+    "elysia": "latest",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "module": "src/index.js"
 }
