@@ -15,13 +15,14 @@ io.on("connection", (ws) => {
     if (!room || !room.join(user)) return
     ws.on("disconnect", () => {
         console.log(`user ${user} left room ${roomId}`)
-        ws.broadcast("update", room.toJSON("clientCount"))
+        room.leave(user)
+        ws.broadcast("update", room.toJSON("clientCount", "msgs"))
     })
 
     ws.on("add_uid", (uid: string) => {
         const isMsg = room.addUid(uid, user)
-        ws.broadcast("update", isMsg ? room.toJSON("msgs") : room.toJSON("current", "history"))
-        ws.reply("update", isMsg ? room.toJSON("msgs") : room.toJSON("current", "history"))
+        ws.broadcast("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
+        ws.reply("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
     })
 
     ws.on("del_uid", (uid: string) => {
@@ -43,7 +44,7 @@ io.on("connection", (ws) => {
     })
 
     console.log(`user ${user} joined room ${roomId}`)
-    ws.broadcast("update", room.toJSON("clientCount"))
+    ws.broadcast("update", room.toJSON("clientCount", "msgs"))
     ws.reply("update", room.toJSON())
 })
 
@@ -56,26 +57,39 @@ watch("./public", { recursive: true }, (rev, filename) => {
 const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
     app
         .get("/", () => bun.file("public/index.html"))
-        .get("/uid", ({ params: { room } }) => JSON.stringify(Room.getRoom(room)?.toJSON()))
-        .get("/list", ({ params: { room } }) => Room.getRoom(room)?.current.join(","))
-        .get("/history", ({ params: { room } }) => Room.getRoom(room)?.history.join(","))
+        .get("/uid", (r) => {
+            const room = r.params?.room
+            return JSON.stringify(Room.getRoom(room)?.toJSON())
+        })
+        .get("/list", (r) => {
+            const room = r.params?.room
+            return Room.getRoom(room)
+                ?.current.map(({ uid }) => uid)
+                .join(",")
+        })
+        .get("/history", (r) => {
+            const room = r.params?.room
+            return Room.getRoom(room)
+                ?.history.map(({ uid }) => uid)
+                .join(",")
+        })
         .get("/add/:uid", ({ params: { room, uid }, query: { cooker } }) => {
             const r = Room.getRoom(room)
-            if (!r) return
+            if (!r) return null
             const res = r.addUid(decodeURI(uid), cooker)
-            io.to(room)?.emit("update", r.toJSON("current", "history"))
+            io.to(room)?.emit("update", r.toJSON("current", "msgs"))
             return res
         })
         .get("/del/:uid", ({ params: { room, uid } }) => {
             const r = Room.getRoom(room)
-            if (!r) return
+            if (!r) return null
             const res = r.delUid(uid)
             io.to(room)?.emit("update", r.toJSON("current", "history"))
             return res
         })
         .get("/act/:id", ({ params: { room, id }, query: { user, req } }) => {
             const r = Room.getRoom(room)
-            if (!r) return
+            if (!r) return null
             const res = r.addAct(id, user, req)
             io.to(room)?.emit("update", r.toJSON("activities"))
             return res

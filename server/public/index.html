@@ -29,6 +29,7 @@
                             class="ys-list-item"
                             v-for="activity in room.activities"
                             :key="activity.id"
+                            :style="{ '--h': idToColor(activity.id) }"
                             :class="{ active: activity.users.includes(player.name)}"
                             @click="activity.users.includes(player.name) && copyText(activity.uid)"
                         >
@@ -38,22 +39,35 @@
                                     <div class="tag" v-else>已开始</div>
                                     {{ activity.owner }}
                                 </div>
-                                <div class="uid">UID: {{ activity.uid }}</div>
+                                <div class="uid">UID: {{ activity.users.includes(player.name) ? activity.uid : maskUid(activity.uid) }}</div>
                             </div>
-                            <div class="time">⏳{{ formatTime(activity.time) }}</div>
+                            <div class="detail">
+                                <ul class="users">
+                                    <li class="uname" v-for="user in activity.users" :key="user">{{ user }}</li>
+                                </ul>
+                                <div class="time">⚔️{{ formatTime(activity.time, '') }}</div>
+                            </div>
                             <div class="box">
                                 <div class="num">{{ activity.users.length + 1 }} / 4</div>
-                                <button type="button" class="ys-btn" :disabled="!activity.users.includes(player.name) && !(!activity.req || activity.req & player.flag)" @click.stop="addActivity(activity.id)">
+                                <button
+                                    type="button"
+                                    class="ys-btn"
+                                    :disabled="!activity.users.includes(player.name) && !(!activity.req || activity.req & player.flag)"
+                                    @click.stop="addActivity(activity.id)"
+                                >
                                     {{ activity.owner === player.name ? "结束": "加入" }}
                                 </button>
                             </div>
                         </li>
-                        <li class="ys-list-item" v-for="uid in room.current" :key="uid.id">
+                        <li class="ys-list-item" v-for="uid in room.current" :key="uid.id" :style="{ '--h': idToColor(uid.id) }">
                             <div class="content">
                                 <div class="cooker">{{ uid.cooker }}</div>
                                 <div class="uid">UID: {{ uid.uid }}</div>
                             </div>
-                            <div class="time">⏳{{ formatTime(uid.cookTime) }}</div>
+                            <div class="detail">
+                                <span class="no-select">&nbsp;</span>
+                                <div class="time">⏳{{ formatTime(uid.cookTime) }}</div>
+                            </div>
                             <button type="button" class="ys-btn" @click.stop="addActivity(uid.id)">匹配</button>
                         </li>
                     </transition-group>
@@ -188,14 +202,15 @@
                 Object.assign(room.value, data)
                 if (data.activities) {
                     // 需要从当前列表中删除已开始的活动
-                    const inact = room.value.current.filter((item) => data.activities.some((act) => act.id == item.id))
-                    if (inact.length) {
-                        room.value.current = room.value.current.filter((item) => !inact.some((act) => act.id == item.id))
+                    const ids = new Set(data.activities.map((item) => item.id))
+                    const ex = new Set(room.value.current.map((item) => item.id).filter((id) => ids.has(id)))
+                    if (ex.size) {
                         room.value.history = [
                             //
-                            ...room.value.history.filter((item) => !inact.some((act) => act.id == item.id)),
-                            ...inact.map((act) => ({ ...act, user: act.owner, time: ~~(Date.now() / 1000) })),
+                            ...room.value.history.filter((item) => !ex.has(item.id)),
+                            ...data.activities.filter((item) => ex.has(item.id)).map((v) => ({ ...v, user: v.owner, ...room.value.current.find((i) => i.id == v.id) })),
                         ]
+                        room.value.current = room.value.current.filter((item) => !ex.has(item.id))
                     }
                 }
             }
@@ -211,7 +226,7 @@
 
             const scrollToBottom = (force = false) => {
                 const list = document.querySelector(".msg-list")
-                if (list && list.scrollTop >= list.scrollHeight - list.clientHeight) {
+                if (list && list.scrollTop >= list.scrollHeight * 0.8 - list.clientHeight) {
                     Vue.nextTick(() => {
                         list.scrollTop = list.scrollHeight
                     })
@@ -237,14 +252,14 @@
                 })
             }
 
-            const formatTime = (time) => {
+            const formatTime = (time, subfix = "前") => {
                 const diff = nowSeconds.value - time
                 if (diff <= 0) return "刚刚"
                 if (diff > 24 * 3600) return new Date(time * 1000).toLocaleString("zh")
                 if (diff > 3600) return new Date(time * 1000).toLocaleTimeString("zh")
                 const minute = ~~(diff / 60)
                 const second = diff % 60
-                return `${minute}分${second}秒前`
+                return `${minute}分${second}秒${subfix}`
             }
             const renderUserName = (user) => (user !== player.value.name ? user : "你")
             const joinRoom = async () => {
@@ -364,6 +379,19 @@
                 translateTag,
                 addActivity,
                 renderUserName,
+                maskUid: (uid) => uid.slice(0, 3) + "***" + uid.slice(6),
+                idToColor: (id) => {
+                    let hash = 0,
+                        i,
+                        chr
+                    if (id.length === 0) return hash
+                    for (i = 0; i < id.length; i++) {
+                        chr = id.charCodeAt(i)
+                        hash = (hash << 5) - hash + chr
+                        hash |= 0 // Convert to 32bit integer
+                    }
+                    return hash % 360
+                },
             }
         },
     }).mount("#app")
@@ -579,6 +607,7 @@
         transition: all 0.3s ease;
         box-shadow: 1rem 1rem 3rem rgba(0, 0, 0, 0.05);
         position: relative;
+        background-image: linear-gradient(75deg, transparent 50%, hsla(var(--h), 60%, 60%, 0.5));
     }
 
     .tag {
@@ -598,12 +627,12 @@
         margin-bottom: 0;
     }
 
-    .ys-list-item:nth-child(odd) {
+    /* .ys-list-item:nth-child(odd) {
         background-image: linear-gradient(75deg, rgba(77, 126, 74, 0), rgba(77, 126, 74, 0), rgba(77, 126, 74, 0.3), rgba(77, 126, 74, 0.5));
     }
     .ys-list-item:nth-child(even) {
         background-image: linear-gradient(75deg, rgba(37, 80, 171, 0), rgba(37, 80, 171, 0), rgba(37, 80, 171, 0.3), rgba(37, 80, 171, 0.5));
-    }
+    } */
 
     .ys-list-item:hover {
         background-color: var(--ys-color-selected-text);
@@ -613,7 +642,7 @@
     .ys-list-item.active {
         cursor: pointer;
     }
-    .uid-list ul {
+    .uid-list > ul {
         margin: 10rem 8rem;
         position: relative;
     }
@@ -629,16 +658,31 @@
     .ys-list-item .uid {
         font-size: 14rem;
     }
-    .ys-list-item .time {
+    .ys-list-item .detail {
         font-size: 14rem;
-        color: var(--ys-color-tip);
-        font-weight: bold;
         pointer-events: none;
         user-select: none;
-        text-shadow: 0rem 0rem 3rem white, 0rem 0rem 2rem white;
-        position: absolute;
-        left: 180rem;
-        bottom: 10rem;
+        color: var(--ys-color-tip);
+        font-weight: bold;
+        text-shadow: 0rem 0rem 2rem white, 0rem 0rem 3rem rgba(255, 255, 255, 0.5);
+        margin-left: 20rem;
+        flex: 1;
+    }
+    .ys-list-item .detail .users {
+        gap: 4rem;
+        display: flex;
+        color: var(--ys-color-tip);
+    }
+    .ys-list-item .detail .users .uname {
+        border-radius: 5rem;
+        background-color: rgba(42, 87, 233, 0.4);
+        color: var(--ys-color-bright);
+        text-shadow: 0rem 0rem 2rem rgba(0, 0, 0, 0.3);
+        padding: 4rem;
+        font-size: 12rem;
+        overflow: hidden;
+        text-overflow: hidden;
+        white-space: nowrap;
     }
     .ys-list-item .box {
         position: relative;
@@ -789,5 +833,8 @@
     }
     .ml-0 {
         margin-left: 0;
+    }
+    .no-select {
+        user-select: none;
     }
 </style>

@@ -350,31 +350,11 @@ _auto_send(reply := "") {
     isSub := CheckColor(x + w - 115, y + h - 36, "1B1B1B")
     CoordMode "Pixel", "Client"
     if isSub {
-        ; 私车
-        if reply != "" {
-            _Lusi_text := "#{2}: {1} (re:{3})"
-            A_Clipboard := Format(_Lusi_text, A_Clipboard, add_counter_local(), SubStr(reply, 1, 6))
-        }
         ControlClick "x" . (w - 120) . " y" . (h - 36), "QQ频道", , "RIGHT" ; 右键
         ControlClick "x" . (w - 84) . " y" . (h - 60), "QQ频道" ; 粘贴
         Sleep 450
         ControlClick "x" . (w - 54) . " y" . (h - 40), "QQ频道"
     } else {
-        ; 公车
-        c := add_counter_local()
-        is_strict := false
-        if is_strict {
-            _Lusi_text := "{1} 路4自动饭第{2}碗 规则:" . _LineSep . "1. 进去记得打招呼 自动门地主不回复默认不打" . _LineSep . "2. 进去之后贴表情 没贴满3个就是没满 2分钟不满默认炸" . _LineSep . "3. 黑图或者拒绝贴个猴表示炸车" . _LineSep . "4. 优先上前面没满的车" . _LineSep . "5. 只发车不打 发生纠纷与我无关 上车默认同意规则"
-            _Lusi_text2 := "{1} 路4自动饭第{2}碗 规则同上"
-            if Mod(c, 2) == 1 {
-                A_Clipboard := Format(_Lusi_text, A_Clipboard, c)
-            } else {
-                A_Clipboard := Format(_Lusi_text2, A_Clipboard, c)
-            }
-        } else {
-            _Lusi_text := "{1} 路4第{2}车 发车不打 注意礼貌 (re:{3})"
-            A_Clipboard := Format(_Lusi_text, A_Clipboard, c, reply)
-        }
         ControlClick "x" . (w - 539) . " y" . (h - 145), "QQ频道", , "RIGHT" ; 右键
         ControlClick "x" . (w - 496) . " y" . (h - 60), "QQ频道" ; 粘贴
         Sleep 450

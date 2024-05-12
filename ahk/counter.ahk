@@ -72,13 +72,18 @@ class YSCounter {
             this.counter_last_update_time := A_TickCount
         }
         this.Save()
-        format_time_diff(t) {
-            milliseconds := mod(t, 1000)
-            seconds := mod(t / 1000, 60)
-            minutes := mod(t / (1000 * 60), 60)
-            hours := t / (1000 * 60 * 60)
-            return Format("+{:d}:{:02d}:{:02d}.{:03d}", hours, minutes, seconds, milliseconds)
-        }
     }
+}
 
+format_time_diff(t) {
+    milliseconds := mod(t, 1000)
+    seconds := mod(t / 1000, 60)
+    minutes := mod(t / (1000 * 60), 60)
+    hours := t / (1000 * 60 * 60)
+    if hours >= 1 {
+        return Format("+{:d}:{:02d}:{:02d}.{:03d}", hours, minutes, seconds, milliseconds)
+    }
+    else {
+        return Format("+{:02d}:{:02d}.{:03d}", minutes, seconds, milliseconds)
+    }
 }

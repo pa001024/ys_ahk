@@ -65,6 +65,7 @@ export class Room implements IRoom {
     static rooms: { [key: string]: Room } = {}
 
     join(user: string) {
+        if (!user || user.length > 10) return false
         if (this.clientCount >= this.maxClient) return false
         this.clientCount++
         if (user in this.onlineUsers) {
@@ -159,7 +160,11 @@ export class Room implements IRoom {
                 users: [user],
                 time: Math.floor(Date.now() / 1000),
             }
-            this.activities = [...this.activities, act]
+            this.activities = [
+                // 超过10分钟的活动自动清理
+                ...this.activities.filter((item) => Math.floor(Date.now() / 1000) - item.time < 10 * 60),
+                act,
+            ]
             this.delUid(this.current[index].uid, user)
             return act
         }
@@ -208,7 +213,7 @@ export class Room implements IRoom {
             history: this.history,
             count: this.count,
             msgs: this.msgs,
-            activity: this.activities,
+            activities: this.activities,
         }
     }
 
@@ -238,6 +243,7 @@ export class Room implements IRoom {
             this.history = obj.history || []
             this.count = obj.count || 0
             this.msgs = obj.msgs || []
+            this.activities = obj.activities || []
         } catch (e) {
             console.error(`读取房间数据失败：${this.id}`)
         }

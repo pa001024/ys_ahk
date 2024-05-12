@@ -436,7 +436,6 @@ class GameControl:
 
     replyGroups = [
         [cfg_exitpattern, cfg_exitmsg, "exit"],
-        [cfg_successpattern, cfg_successmsg, "success"],
         [r"[那哪][三3]?个|说说看|怎么打|材料|几只|什么|啥|^[\?？]|。。。|\.\.\.", "就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~", "idle"],
         [r"为什么|怎么不|干[嘛吗]", "这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~", "idle"],
         [r"帮我|^帮", "要帮忙的话可以让他们帮哦~~", "idle"],
@@ -444,8 +443,7 @@ class GameControl:
         [r"^你知道", "我不知道哦~~你可以问问他们", "idle"],
         [r"没开|没解锁", "没事的，锚点开了就行", "idle"],
         [r"挂\?|开了|大哥|开挂", "不会哦，你一会可以看展柜", "idle"],
-        [r"你朋友", "嗯啊我来探路", "idle"],
-        # [r"核爆", "打点摩拉而已", "idle"],
+        [cfg_successpattern, cfg_successmsg, "success"],
     ]
 
     inputSet = set()
@@ -643,7 +641,8 @@ def main_loop():
     while game.isForeground():
         try:
             if len(game.GetUIDList()) >= 3:
-                time.sleep(5)
+                with console.status("[red]UID池已满 等待中..."):
+                    time.sleep(5)
                 continue
             game.AutoCook()
             # game.AutoReply()

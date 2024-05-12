@@ -65,21 +65,6 @@ CapsLock & q:: {
   Send "m"
 }
 
-global _local_counter := 0
-if FileExist("counter.txt")
-  _local_counter := Number(FileRead("counter.txt"))
-
-add_counter_local() {
-  global _local_counter := _local_counter + 1
-  try FileDelete("counter.txt")
-  FileAppend(String(_local_counter), "counter.txt")
-  return _local_counter
-}
-reset_counter_local() {
-  global _local_counter := 0
-  try FileDelete("counter.txt")
-  return _local_counter
-}
 
 ; 全自动做饭
 CapsLock & F2:: _auto_cook_sevice()
@@ -89,7 +74,8 @@ CapsLock & 1:: {
   ; _auto_msg("能让我打个精英怪不 o.0") ; 单刷
   _auto_msg("可以让我的几个朋友进来打下枫丹传奇不 ~~ ") ; 一般
   A_Clipboard := _copy_uid()
-  _auto_send()
+  ; _auto_send()
+  API.AddUID(A_Clipboard)
   ; _f3()
 }
 CapsLock & 2:: _auto_msg("我们刷的怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~")
@@ -99,8 +85,22 @@ CapsLock & 3:: _auto_msg("我们三个是一起的，如果显示人数已满麻
 CapsLock & 4:: {
   _auto_msg("<散olor=#E99697>拜拜~祝你游戏愉快</散olor>")
   _auto_exit()
+  t := YSCounter.counter_last_update_time
   YSCounter.Add(4)
+  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(A_TickCount - t)))
 }
+
+; 计数器
+CapsLock & Numpad1:: YSCounter.Add(1)
+CapsLock & Numpad2:: YSCounter.Add(2)
+CapsLock & Numpad3:: YSCounter.Add(3)
+CapsLock & Numpad4:: YSCounter.Add(4)
+CapsLock & Numpad5:: YSCounter.Add(5)
+CapsLock & Numpad6:: YSCounter.Add(6)
+CapsLock & Numpad7:: YSCounter.Add(7)
+CapsLock & Numpad8:: YSCounter.Add(8)
+CapsLock & Numpad9:: YSCounter.Add(9)
+CapsLock & Numpad0:: YSCounter.Add(-1)
 ; 传送利亚姆
 F3:: {
   Send "{F1}"

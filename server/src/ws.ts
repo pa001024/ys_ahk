@@ -6,6 +6,7 @@ import { Room } from "./room"
 export class WsServer {
     private emitter = new EventEmitter()
     wsMap = new Map<string, WsConnection>()
+    roomMap = new Map<string, WsConnection[]>()
     constructor(private app: Elysia) {
         this.app
             .derive(({ query: { user, room } }) => {
@@ -20,14 +21,20 @@ export class WsServer {
                     const wc = new WsConnection(ws as any)
                     this.emitter.emit("connection", wc)
                     this.wsMap.set(ws.id, wc)
+                    if (this.roomMap.has(roomId)) this.roomMap.get(roomId)!.push(wc)
+                    else this.roomMap.set(roomId, [wc])
                 },
                 close: (ws, code, reason) => {
                     const { roomId, user } = ws.data
                     const room = Room.getRoom(roomId)
-                    if (room && user) room.leave(user)
                     const wc = this.wsMap.get(ws.id)
                     if (wc) wc.emitter.emit("disconnect", room, user)
                     this.wsMap.delete(ws.id)
+                    const roomConnections = this.roomMap.get(roomId!)
+                    if (roomConnections) {
+                        roomConnections.splice(roomConnections.indexOf(wc!), 1)
+                        if (roomConnections.length === 0) this.roomMap.delete(roomId!)
+                    }
                 },
                 message: (ws, message: any) => {
                     if (message.event) {
@@ -46,10 +53,8 @@ export class WsServer {
             break
         }
     }
-    to(roomId: string) {
-        for (const wc of this.wsMap.values()) {
-            if (wc.roomId === roomId) return wc
-        }
+    to(roomId = "default") {
+        return this.roomMap.get(roomId)!.at(0)
     }
 }
 
