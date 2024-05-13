@@ -25,7 +25,6 @@ cfg_endpoint = config.get("cook", "endpoint")
 if cfg_endpoint.endswith("/"):
     cfg_endpoint = cfg_endpoint[:-1]
 cfg_cooker = config.get("cook", "cooker")
-cfg_checkmap = config.getint("cook", "checkmap")
 cfg_entermsg = config.get("cook", "entermsg")
 cfg_enteremo = config.getint("cook", "enteremo")
 cfg_successpattern = config.get("cook", "successpattern")
@@ -42,6 +41,12 @@ cfg_timeout_reply_wait = config.getint("cook", "timeout_reply_wait")
 cfg_timeout_reply_msg = config.get("cook", "timeout_reply_msg")
 cfg_timeout_reply_emo = config.getint("cook", "timeout_reply_emo")
 cfg_timeout_reply_add_fmt = config.get("cook", "timeout_reply_add_fmt")
+
+cfg_checkmap = config.getint("cook", "checkmap")
+cfg_checkmap_f1_delay = config.getfloat("cook", "checkmap_f1_delay")
+cfg_checkmap_step_delay = config.getfloat("cook", "checkmap_step_delay")
+cfg_checkmap_scroll_delay = config.getfloat("cook", "checkmap_scroll_delay")
+cfg_checkmap_check_delay = config.getfloat("cook", "checkmap_check_delay")
 
 
 # 识别数字
@@ -112,6 +117,10 @@ class GameControl:
     def toScreenPos(self, x, y):
         cx, cy = wg.ClientToScreen(self.hwnd, (x, y))
         return (cx * self.w // 1600), (cy * self.h // 900)
+
+    def toScreenRect(self, x, y, w, h):
+        cx, cy = wg.ClientToScreen(self.hwnd, (x, y))
+        return (cx * self.w // 1600), (cy * self.h // 900), (cx * self.w // 1600) + (w * self.w // 1600), (cy * self.h // 900) + (h * self.h // 900)
 
     def Click(self, x, y, count=1):
         mouse.position = self.toScreenPos(x, y)
@@ -401,30 +410,30 @@ class GameControl:
             self.EnterMain()
             time.sleep(1)
             pg.press("f1")
-            time.sleep(1)
+            time.sleep(cfg_checkmap_f1_delay)
             self.Click(240, 452)  # 讨伐
-            time.sleep(0.1)
+            time.sleep(cfg_checkmap_step_delay)
             self.Click(480, 170)  # 全部
-            time.sleep(0.1)
+            time.sleep(cfg_checkmap_step_delay)
             self.Click(499, 364)  # 首领
-            time.sleep(0.1)
+            time.sleep(cfg_checkmap_step_delay)
             self.Click(797, 693)  # 滚动条
-            time.sleep(0.3)
+            time.sleep(cfg_checkmap_scroll_delay)
             self.Click(797, 693)  # 滚动条
-            time.sleep(0.3)
+            time.sleep(cfg_checkmap_scroll_delay)
             self.Click(419, 361)  # 冰风
-            time.sleep(0.1)
+            time.sleep(cfg_checkmap_step_delay)
             self.Click(1205, 699)  # 追踪
-            time.sleep(0.1)
+            time.sleep(cfg_checkmap_step_delay)
             self.Click(1205, 699)  # 追踪
             self.WaitState("map")
-            time.sleep(0.5)
+            time.sleep(cfg_checkmap_check_delay)
             rst = self.CheckColor(1219, 367, "E.E.E.")
             if rst and teleport:
                 self.Click(1219, 367)
-                time.sleep(0.1)
+                time.sleep(cfg_checkmap_step_delay)
                 self.Click(1227, 839)
-                time.sleep(0.2)
+                time.sleep(cfg_checkmap_step_delay)
         console.log(f"[green]AutoCheckMap: [green]{rst}")
         return rst
 
@@ -556,8 +565,7 @@ class GameControl:
         self.WaitColor(421, 166, "DAD5CB")
         self.Click(421, 166)
         self.WaitColor(537, 457, "A7B982")
-        (x, y) = self.toScreenPos(518, 164)
-        text = OCRNumber((x, y, x + 106 * self.w // 1600, y + 19 * self.h // 900))
+        text = OCRNumber(self.toScreenRect(518, 164, 106, 19))
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
@@ -571,12 +579,11 @@ class GameControl:
         self.WaitColor(421, 166, "DAD5CB")
         self.Click(421, 166)
         self.WaitColor(537, 457, "A7B982")
-        (x, y) = self.toScreenPos(518, 164)
-        text = OCRNumber((x, y, x + 106 * self.w // 1600, y + 19 * self.h // 900))
+        text = OCRNumber(self.toScreenRect(518, 164, 106, 19))
         if text:
             console.log(f"[green]UID：[yellow]{text}")
             if re.match(r"^\d{9}$", text):
-                img = ImageGrab.grab((360, 535, 733, 559))
+                img = ImageGrab.grab(self.toScreenRect(360, 535, 373, 24))
                 img = np.array(img)
                 sign = self.RecognizeText(img)
                 if re.match(cfg_timeout_noreply_sign_pattern, sign):
@@ -640,10 +647,13 @@ def main_loop():
     game = GameControl(hwnd)
     while game.isForeground():
         try:
-            if len(game.GetUIDList()) >= 3:
-                with console.status("[red]UID池已满 等待中..."):
+            with console.status("[red]UID池已满 等待中..."):
+                while len(game.GetUIDList()) >= 3:
+                    if not game.isForeground():
+                        console.log(f"[green]切换窗口 退出")
+                        break
                     time.sleep(5)
-                continue
+                    continue
             game.AutoCook()
             # game.AutoReply()
         except Exception as e:

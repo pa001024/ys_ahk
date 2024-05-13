@@ -20,7 +20,7 @@ io.on("connection", (ws) => {
     })
 
     ws.on("add_uid", (uid: string) => {
-        const isMsg = room.addUid(uid, user)
+        const isMsg = room.addUid(String(uid), user)
         ws.broadcast("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
         ws.reply("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
     })

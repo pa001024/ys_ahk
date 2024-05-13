@@ -27,50 +27,48 @@
                     <transition-group name="list" tag="ul">
                         <li
                             class="ys-list-item"
-                            v-for="activity in room.activities"
-                            :key="activity.id"
-                            :style="{ '--h': idToColor(activity.id) }"
-                            :class="{ active: activity.users.includes(player.name)}"
-                            @click="activity.users.includes(player.name) && copyText(activity.uid)"
+                            v-for="item in (follow.user && follow.enable ? room.activities.filter(activity => activity.owner === follow.user) : [...room.activities, ...room.current])"
+                            :key="item.id"
+                            :style="{ '--h': idToColor(item.id) }"
+                            :class="{ active: item.users?.includes(player.name)}"
+                            @click="item.users?.includes(player.name) && copyText(item.uid)"
                         >
                             <div class="content">
                                 <div class="cooker">
-                                    <div class="tag joined" v-if="activity.users.includes(player.name)">已加入</div>
-                                    <div class="tag" v-else>已开始</div>
-                                    {{ activity.owner }}
+                                    <div class="tag joined" v-if="item.users?.includes(player.name)">已加入</div>
+                                    <div class="tag" v-else-if="item.owner">已开始</div>
+                                    {{ item.owner || item.cooker }}
                                 </div>
-                                <div class="uid">UID: {{ activity.users.includes(player.name) ? activity.uid : maskUid(activity.uid) }}</div>
+                                <div class="uid">UID: {{ item.users?.includes(player.name) ? item.uid : maskUid(item.uid) }}</div>
                             </div>
                             <div class="detail">
                                 <ul class="users">
-                                    <li class="uname" v-for="user in activity.users" :key="user">{{ user }}</li>
+                                    <li class="uname" v-for="user in item.users?.slice(1)" :key="user">{{ user }}</li>
                                 </ul>
-                                <div class="time">⚔️{{ formatTime(activity.time, '') }}</div>
+                                <div class="time" v-if="item.owner">⚔️{{ formatTime(item.time, '') }}</div>
+                                <div class="time" v-else>⏳{{ formatTime(item.cookTime) }}</div>
                             </div>
                             <div class="box">
-                                <div class="num">{{ activity.users.length + 1 }} / 4</div>
+                                <div class="num" v-if="item.owner">{{ item.users?.length + 1 }} / 4</div>
                                 <button
                                     type="button"
                                     class="ys-btn"
-                                    :disabled="!activity.users.includes(player.name) && !(!activity.req || activity.req & player.flag)"
-                                    @click.stop="addActivity(activity.id)"
+                                    :disabled="!item.users?.includes(player.name) && !(!item.req || item.req & player.flag)"
+                                    @click.stop="addActivity(item.id)"
                                 >
-                                    {{ activity.owner === player.name ? "结束": "加入" }}
+                                    {{ item.owner ? item.owner === player.name ? "结束": "加入" : "匹配"}}
                                 </button>
                             </div>
                         </li>
-                        <li class="ys-list-item" v-for="uid in room.current" :key="uid.id" :style="{ '--h': idToColor(uid.id) }">
-                            <div class="content">
-                                <div class="cooker">{{ uid.cooker }}</div>
-                                <div class="uid">UID: {{ uid.uid }}</div>
-                            </div>
-                            <div class="detail">
-                                <span class="no-select">&nbsp;</span>
-                                <div class="time">⏳{{ formatTime(uid.cookTime) }}</div>
-                            </div>
-                            <button type="button" class="ys-btn" @click.stop="addActivity(uid.id)">匹配</button>
-                        </li>
                     </transition-group>
+                </div>
+                <div class="follow" v-if="follow.user && follow.enable">
+                    已隐藏除{{ follow.user }}外的其他匹配
+                    <button type="button" class="ys-btn" @click="follow.enable = false">取消</button>
+                </div>
+                <div class="follow" v-if="follow.user && nowSeconds < follow.time && !follow.enable">
+                    是否关注{{ follow.user }}
+                    <button type="button" class="ys-btn" @click="follow.enable = true">关注</button>
                 </div>
                 <div class="msg-list flex-1">
                     <ul>
@@ -80,8 +78,8 @@
                                 <div class="tip" v-else>{{ renderUserName(msg.user) }}开始匹配{{ msg.uid }}</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
-                            <div class="content banner" v-else-if="translateTag(msg.text) !== msg.text">
-                                <div class="tip">{{ renderUserName(msg.user) }}{{ translateTag(msg.text) }}了房间</div>
+                            <div class="content banner" v-else-if="translateTag(msg.text, msg) !== msg.text">
+                                <div class="tip">{{ translateTag(msg.text, msg) }}</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
                             <div class="content" v-else>
@@ -164,8 +162,8 @@
             wait(event) {
                 return new Promise((resolve) => {
                     const handler = (e) => {
-                        resolve(e.detail.data)
                         this.ws.removeEventListener(event, handler)
+                        resolve(e.detail.data)
                     }
                     this.ws.addEventListener(event, handler)
                 })
@@ -186,18 +184,11 @@
             const socket = player.value.name ? io(roomId.value, player.value.name) : {}
             const showSetting = ref(!player.value.name)
             const nowSeconds = ref(~~(Date.now() / 1000))
-            setInterval(() => {
-                nowSeconds.value = ~~(Date.now() / 1000)
-            }, 1e3)
+            setInterval(() => (nowSeconds.value = ~~(Date.now() / 1000)), 1e3)
             const newUid = ref("")
-            const room = ref({ current: [], history: [], msgs: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
-            const translateTag = (tag) => {
-                const table = {
-                    "<enter>": "进入",
-                    "<leave>": "离开",
-                }
-                return table[tag] || tag
-            }
+            const room = ref({ current: [], history: [], msgs: [], activities: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
+            const follow = ref({ user: "", time: 0, enable: false })
+            const count = ref(+localStorage.getItem("count") || -1)
             const updateData = (data) => {
                 Object.assign(room.value, data)
                 if (data.activities) {
@@ -314,27 +305,48 @@
             const addUid = async () => {
                 if (newUid.value.trim()) {
                     const text = newUid.value.trim()
-                    if (/^\d{9}$/.test(text)) {
-                        if (room.value.current.includes(text)) return
-                        if (room.value.history.some((item) => item.uid == text)) {
-                            room.value.history.splice(
-                                room.value.history.find((item) => item.uid == text),
-                                1
-                            )
+                    // 内置指令
+                    if (text.startsWith("/")) {
+                        const cmd = text.slice(1).split(" ")
+                        // 计数器
+                        if (cmd[0] === "c" || cmd[0] === "count" || cmd[0] === "s" || cmd[0] === "stop") {
+                            const value = cmd[0] === "s" || cmd[0] === "stop" ? -1 : +cmd[1] || 0
+                            count.value = value
+                            localStorage.setItem("count", value)
+                            room.value.msgs.push({
+                                id: Math.random().toString(36).substr(3),
+                                user: player.value.name,
+                                text: `<count>`,
+                                time: Math.floor(Date.now() / 1000),
+                            })
+                            scrollToBottom()
+                        } else if (cmd[0] === "f" || cmd[0] === "follow") {
+                            const user = cmd[1] || ""
+                            follow.value = { user, time: 0, enable: true }
                         }
                     } else {
-                        room.value.msgs.push({
-                            id: Math.random().toString(36).substr(3),
-                            user: player.value.name,
-                            text,
-                            time: Math.floor(Date.now() / 1000),
-                        })
-                        scrollToBottom()
-                    }
-                    if (socket.id) {
-                        socket.emit("add_uid", text)
-                    } else {
-                        await fetch(baseURL + "add/" + text)
+                        if (/^\d{9}$/.test(text)) {
+                            if (room.value.current.includes(text)) return
+                            if (room.value.history.some((item) => item.uid == text)) {
+                                room.value.history.splice(
+                                    room.value.history.find((item) => item.uid == text),
+                                    1
+                                )
+                            }
+                        } else {
+                            room.value.msgs.push({
+                                id: Math.random().toString(36).substr(3),
+                                user: player.value.name,
+                                text,
+                                time: Math.floor(Date.now() / 1000),
+                            })
+                            scrollToBottom()
+                        }
+                        if (socket.id) {
+                            socket.emit("add_uid", text)
+                        } else {
+                            await fetch(baseURL + "add/" + text)
+                        }
                     }
                     newUid.value = ""
                 }
@@ -344,10 +356,18 @@
                 if (act) {
                     if (act.owner === player.value.name) {
                         socket.emit("del_act", { id })
+                        const passedTime = nowSeconds.value - act.time
+                        if (passedTime > 40 && count.value >= 0) {
+                            localStorage.setItem("count", ++count.value)
+                            socket.emit("add_uid", `计数: ${count.value}`)
+                        }
                         return
                     }
                     if (act.users.includes(player.value.name)) {
                         copyText(act.uid)
+                        if (act.owner !== player.value.name && !follow.value.enable) {
+                            follow.value = { user: act.owner, time: nowSeconds.value + 15, enable: false }
+                        }
                         return
                     }
                 }
@@ -355,11 +375,15 @@
                     socket.emit("add_act", { id, flag: player.value.flag })
                     const act = await socket.wait("act_ok")
                     copyText(act.uid)
+                    if (act.owner !== player.value.name && !follow.value.enable) {
+                        follow.value = { user: act.owner, time: nowSeconds.value + 15, enable: false }
+                    }
                 } else {
                     await fetch(baseURL + "act/" + id)
                 }
                 return
             }
+
             return {
                 roomId,
                 showSetting,
@@ -370,13 +394,13 @@
                 nowSeconds,
                 room,
                 newUid,
+                follow,
                 joinRoom,
                 removeUid,
                 copyText,
                 addUid,
                 formatTime,
                 mixMsgList,
-                translateTag,
                 addActivity,
                 renderUserName,
                 maskUid: (uid) => uid.slice(0, 3) + "***" + uid.slice(6),
@@ -391,6 +415,14 @@
                         hash |= 0 // Convert to 32bit integer
                     }
                     return hash % 360
+                },
+                translateTag: (tag, msg) => {
+                    const table = {
+                        "<enter>": `${msg.user}进入了房间`,
+                        "<leave>": `${msg.user}离开了房间`,
+                        "<count>": `已设置计数为${count.value}`,
+                    }
+                    return table[tag] || tag
                 },
             }
         },
@@ -412,6 +444,10 @@
         overflow: hidden;
         color: white;
         background-color: #212134;
+    }
+    #app > * {
+        max-width: 800px;
+        margin: 0 auto;
     }
 
     html {
@@ -609,7 +645,12 @@
         position: relative;
         background-image: linear-gradient(75deg, transparent 50%, hsla(var(--h), 60%, 60%, 0.5));
     }
-
+    .follow {
+        text-align: center;
+        margin: 0 auto;
+        font-size: 18rem;
+        font-weight: bold;
+    }
     .tag {
         border-radius: 5rem;
         padding: 2rem 8rem;
@@ -626,13 +667,6 @@
     .ys-list-item:last-child {
         margin-bottom: 0;
     }
-
-    /* .ys-list-item:nth-child(odd) {
-        background-image: linear-gradient(75deg, rgba(77, 126, 74, 0), rgba(77, 126, 74, 0), rgba(77, 126, 74, 0.3), rgba(77, 126, 74, 0.5));
-    }
-    .ys-list-item:nth-child(even) {
-        background-image: linear-gradient(75deg, rgba(37, 80, 171, 0), rgba(37, 80, 171, 0), rgba(37, 80, 171, 0.3), rgba(37, 80, 171, 0.5));
-    } */
 
     .ys-list-item:hover {
         background-color: var(--ys-color-selected-text);
@@ -672,6 +706,7 @@
         gap: 4rem;
         display: flex;
         color: var(--ys-color-tip);
+        min-height: 20rem;
     }
     .ys-list-item .detail .users .uname {
         border-radius: 5rem;
@@ -691,7 +726,7 @@
         justify-content: center;
         flex-direction: column;
     }
-    .ys-list-item .box .ys-btn {
+    .ys-list-item .box .num + .ys-btn {
         margin-top: 2rem;
     }
     .ys-list-item .num {
@@ -702,7 +737,7 @@
     }
 
     .msg-form {
-        position: fixed;
+        position: absolute;
         bottom: 0;
         left: 0;
         right: 0;
