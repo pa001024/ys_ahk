@@ -330,12 +330,12 @@ _auto_enter() {
         Sleep 800
     }
     if not CheckColor(1218 * w / 1600, 90 * h / 900, "FFFFFF") {
-        Click 1242 * w / 1600, 103 * h / 900
+        Click 1242 * w / 1600, 103 * h / 900 ; 清空
         Sleep 200
     }
-    Click 1242 * w / 1600, 103 * h / 900
+    Click 1242 * w / 1600, 103 * h / 900 ; 粘贴
     Sleep 60
-    Click 1403 * w / 1600, 101 * h / 900
+    Click 1403 * w / 1600, 101 * h / 900 ; 搜索
     Sleep 100
 
     if not CheckColor(257 * w / 1600, 295 * h / 900, "D.D.C.") {

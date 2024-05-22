@@ -27,7 +27,7 @@
                     <transition-group name="list" tag="ul">
                         <li
                             class="ys-list-item"
-                            v-for="item in (follow.user && follow.enable ? room.activities.filter(activity => activity.owner === follow.user) : [...room.activities, ...room.current])"
+                            v-for="item in (follow.user && follow.enable ? room.activities.filter(activity => activity.owner === follow.user || activity.users.includes(follow.user)) : [...room.activities, ...room.current])"
                             :key="item.id"
                             :style="{ '--h': idToColor(item.id) }"
                             :class="{ active: item.users?.includes(player.name)}"
@@ -70,6 +70,11 @@
                     是否关注{{ follow.user }}
                     <button type="button" class="ys-btn" @click="follow.enable = true">关注</button>
                 </div>
+                <div class="follow" v-if="nowSeconds < count.tip && count.value < 0">
+                    开启自动计数
+                    <button type="button" class="ys-btn" @click="count.value = 1">开启</button>
+                </div>
+
                 <div class="msg-list flex-1">
                     <ul>
                         <li class="ys-msg-item" :key="msg.id" v-for="(msg, index) in mixMsgList()" :key="msg.id">
@@ -84,15 +89,25 @@
                             </div>
                             <div class="content" v-else>
                                 <div class="user">{{ renderUserName(msg.user) }}</div>
-                                <div class="text">{{ msg.text }}</div>
+                                <div class="text" @click="msg.text.includes('(点击加入列表)') && addUid(msg.text.match(/\d{9}/g)[0])">{{ msg.text }}</div>
                                 <div class="time">{{ formatTime(msg.time) }}</div>
                             </div>
                             <div class="flex-1"></div>
                         </li>
                     </ul>
                 </div>
-                <form @submit.prevent="addUid" class="flex-box msg-form">
-                    <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." />
+                <form @submit.prevent="submitInput" class="flex-box msg-form">
+                    <div class="ys-autocomplete flex-1">
+                        <ul v-show="newUid.startsWith('/')">
+                            <li @click="setCmd('/c 1')">/c[ount] &lt;当前计数&gt; - 自动计数</li>
+                            <li @click="setCmd('/ct 1')">/ct &lt;当前计数&gt; - 自动计数并计时</li>
+                            <li @click="setCmd('/s', true)">/s[top] - 停止计数</li>
+                            <li @click="setCmd('/u', true)">/u[ser] - 显示用户列表</li>
+                            <li @click="setCmd('/f ')">/f[ollow] &lt;用户名&gt; - 关注指定用户</li>
+                            <li @click="setCmd('/clear', true)">/clear - 清空列表</li>
+                        </ul>
+                        <input type="text" class="ys-input flex-1" v-model="newUid" placeholder="输入消息或UID..." />
+                    </div>
                     <button type="submit" class="ys-btn ml-0">发送</button>
                 </form>
             </article>
@@ -184,11 +199,12 @@
             const socket = player.value.name ? io(roomId.value, player.value.name) : {}
             const showSetting = ref(!player.value.name)
             const nowSeconds = ref(~~(Date.now() / 1000))
-            setInterval(() => (nowSeconds.value = ~~(Date.now() / 1000)), 1e3)
+            let timeOffset = 0
+            setInterval(() => (nowSeconds.value = ~~((Date.now() + timeOffset) / 1000)), 1e3)
             const newUid = ref("")
             const room = ref({ current: [], history: [], msgs: [], activities: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
             const follow = ref({ user: "", time: 0, enable: false })
-            const count = ref(+localStorage.getItem("count") || -1)
+            const count = ref({ tip: 0, ct: false, value: +localStorage.getItem("count") || -1 })
             const updateData = (data) => {
                 Object.assign(room.value, data)
                 if (data.activities) {
@@ -238,19 +254,25 @@
                     updateData(data)
                     scrollToBottom()
                 })
+                socket.on("sync", (t) => {
+                    timeOffset = t - Date.now()
+                })
                 socket.on("reload", () => {
                     location.reload()
                 })
             }
 
+            const formatTimeDiff = (diff, subfix = "前") => {
+                const minute = ~~(diff / 60)
+                const second = diff % 60
+                return `${minute}分${second}秒${subfix}`
+            }
             const formatTime = (time, subfix = "前") => {
                 const diff = nowSeconds.value - time
                 if (diff <= 0) return "刚刚"
                 if (diff > 24 * 3600) return new Date(time * 1000).toLocaleString("zh")
                 if (diff > 3600) return new Date(time * 1000).toLocaleTimeString("zh")
-                const minute = ~~(diff / 60)
-                const second = diff % 60
-                return `${minute}分${second}秒${subfix}`
+                return formatTimeDiff(diff, subfix)
             }
             const renderUserName = (user) => (user !== player.value.name ? user : "你")
             const joinRoom = async () => {
@@ -302,30 +324,58 @@
                     await fetch(baseURL + "del/" + uid[0].uid)
                 }
             }
-            const addUid = async () => {
-                if (newUid.value.trim()) {
-                    const text = newUid.value.trim()
-                    // 内置指令
-                    if (text.startsWith("/")) {
-                        const cmd = text.slice(1).split(" ")
-                        // 计数器
-                        if (cmd[0] === "c" || cmd[0] === "count" || cmd[0] === "s" || cmd[0] === "stop") {
+
+            const addUid = async (text) => {
+                // 内置指令
+                if (text.startsWith("/")) {
+                    const cmd = text.slice(1).split(" ")
+                    // 计数器
+                    let isCt = false
+                    switch (cmd[0]) {
+                        case "ct":
+                        case "count-time":
+                            isCt = true
+                        case "c":
+                        case "count":
+                        case "s":
+                        case "stop":
                             const value = cmd[0] === "s" || cmd[0] === "stop" ? -1 : +cmd[1] || 0
-                            count.value = value
+                            count.value.value = value
+                            count.value.ct = isCt
                             localStorage.setItem("count", value)
                             room.value.msgs.push({
                                 id: Math.random().toString(36).substr(3),
                                 user: player.value.name,
-                                text: `<count>`,
+                                text: value < 0 ? `<count-stop>` : `<count>`,
                                 time: Math.floor(Date.now() / 1000),
                             })
                             scrollToBottom()
-                        } else if (cmd[0] === "f" || cmd[0] === "follow") {
+                            break
+                        case "f":
+                        case "follow":
                             const user = cmd[1] || ""
                             follow.value = { user, time: 0, enable: true }
-                        }
+                            break
+                        case "u":
+                        case "user":
+                            room.value.msgs.push({
+                                id: Math.random().toString(36).substr(3),
+                                user: player.value.name,
+                                text: `<users>`,
+                                time: Math.floor(Date.now() / 1000),
+                            })
+                            scrollToBottom()
+                            break
+                        case "clear":
+                            socket.emit("clear_uid")
+                            break
+                    }
+                } else {
+                    if (socket.id) {
+                        socket.emit("add_uid", text)
                     } else {
-                        if (/^\d{9}$/.test(text)) {
+                        await fetch(baseURL + "add/" + text + `?cooker=${player.value.name}&flag=${player.value.flag}`)
+                        if (/^\d{9}?$/.test(text)) {
                             if (room.value.current.includes(text)) return
                             if (room.value.history.some((item) => item.uid == text)) {
                                 room.value.history.splice(
@@ -342,44 +392,58 @@
                             })
                             scrollToBottom()
                         }
-                        if (socket.id) {
-                            socket.emit("add_uid", text)
-                        } else {
-                            await fetch(baseURL + "add/" + text)
-                        }
                     }
+                }
+            }
+            const submitInput = () => {
+                const text = newUid.value.trim()
+                if (text) {
+                    addUid(text)
                     newUid.value = ""
                 }
             }
             const addActivity = async (id) => {
+                function copyAct(act) {
+                    copyText(act.uid)
+                    // 关注
+                    if (act.owner !== player.value.name && !follow.value.enable) {
+                        follow.value = { user: act.owner, time: nowSeconds.value + 15, enable: false }
+                    }
+                }
                 const act = room.value.activities.find((item) => item.id == id)
                 if (act) {
                     if (act.owner === player.value.name) {
-                        socket.emit("del_act", { id })
-                        const passedTime = nowSeconds.value - act.time
-                        if (passedTime > 40 && count.value >= 0) {
-                            localStorage.setItem("count", ++count.value)
-                            socket.emit("add_uid", `计数: ${count.value}`)
+                        if (socket.id) {
+                            socket.emit("del_act", { id })
+                        } else {
+                            fetch(baseURL + "act/" + id + `?user=${player.value.name}&flag=${player.value.flag}`)
+                        }
+                        const timeUsed = nowSeconds.value - act.time
+                        if (timeUsed > 60) {
+                            if (count.value.value >= 0) {
+                                localStorage.setItem("count", ++count.value.value)
+                                if (count.value.ct) {
+                                    socket.emit("add_uid", `自动计数: ${count.value.value} (输入/c开启)`)
+                                } else {
+                                    socket.emit("add_uid", `自动计数: ${count.value.value} (${formatTimeDiff(timeUsed, "")}) (输入/ct开启)`)
+                                }
+                            } else {
+                                count.value.tip = nowSeconds.value + 10
+                            }
                         }
                         return
                     }
                     if (act.users.includes(player.value.name)) {
-                        copyText(act.uid)
-                        if (act.owner !== player.value.name && !follow.value.enable) {
-                            follow.value = { user: act.owner, time: nowSeconds.value + 15, enable: false }
-                        }
+                        copyAct(act)
                         return
                     }
                 }
                 if (socket.id) {
                     socket.emit("add_act", { id, flag: player.value.flag })
                     const act = await socket.wait("act_ok")
-                    copyText(act.uid)
-                    if (act.owner !== player.value.name && !follow.value.enable) {
-                        follow.value = { user: act.owner, time: nowSeconds.value + 15, enable: false }
-                    }
+                    copyAct(act)
                 } else {
-                    await fetch(baseURL + "act/" + id)
+                    await fetch(baseURL + "act/" + id + `?user=${player.value.name}&flag=${player.value.flag}`)
                 }
                 return
             }
@@ -395,10 +459,12 @@
                 room,
                 newUid,
                 follow,
+                count,
                 joinRoom,
                 removeUid,
                 copyText,
                 addUid,
+                submitInput,
                 formatTime,
                 mixMsgList,
                 addActivity,
@@ -420,9 +486,16 @@
                     const table = {
                         "<enter>": `${msg.user}进入了房间`,
                         "<leave>": `${msg.user}离开了房间`,
-                        "<count>": `已设置计数为${count.value}`,
+                        "<count>": `已设置计数为${count.value.value} (输入/s停止)`,
+                        "<count-stop>": `已停止自动计数`,
+                        "<users>": `当前在线用户: ${Object.keys(room.value.onlineUsers).join(", ")}`,
                     }
                     return table[tag] || tag
+                },
+                setCmd(cmd, send = false) {
+                    newUid.value = cmd
+                    if (send) submitInput()
+                    else document.querySelector(".ys-input").focus()
                 },
             }
         },
@@ -564,6 +637,38 @@
     }
     .ys-input:focus::placeholder {
         color: var(--ys-color-dark);
+    }
+
+    .ys-autocomplete {
+        display: flex;
+        position: relative;
+    }
+    .ys-autocomplete ul:has(+ input:focus) {
+        opacity: 1;
+        transition: opacity 0.3s ease;
+    }
+    .ys-autocomplete ul {
+        opacity: 0;
+        margin: 0 10rem;
+        width: calc(100% - 20rem);
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        transform: translate(0, -100%);
+        background-color: var(--ys-color-selected);
+        color: var(--ys-color-selected-text);
+        padding: 14rem 0;
+        border-radius: 20rem;
+    }
+    .ys-autocomplete ul li {
+        font-size: 18rem;
+        padding: 10rem 20rem;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .ys-autocomplete ul li:hover {
+        background-color: var(--ys-color-selected-text);
+        color: var(--ys-color-text);
     }
 
     .ys-btn-group {

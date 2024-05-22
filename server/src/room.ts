@@ -8,11 +8,23 @@ interface IMessage {
     time: number
 }
 
-interface IUIDItem {
+interface IUIDItem extends Partial<ICookData> {
     id: string
     uid: string
     cookTime: number
     cooker: string
+}
+
+export interface ICookData {
+    uid: string
+    cooker: string
+    img: string
+    name: string
+    sign: string
+    lv: number
+    chat: string[]
+    status: "pending" | "rejected" | "accepted"
+    tag: "f2" | "owned" | "auto"
 }
 
 interface IUIDHistoryItem extends IUIDItem {
@@ -106,8 +118,8 @@ export class Room implements IRoom {
         this.maxClient = count
         this.save()
     }
-    addUid(uid: string, user = "[bot]") {
-        if (!/^\d{9}$/.test(uid)) {
+    addUid<T extends keyof IRoom>(uid: string, user = "[bot]"): T[] {
+        if (!/^\d{9}\.?$/.test(uid)) {
             this.msgs = [
                 ...this.msgs.slice(-19),
                 {
@@ -118,24 +130,74 @@ export class Room implements IRoom {
                 },
             ]
             this.save()
-            return true
+            return ["msgs"] as T[]
         }
-        if (this.current.some((item) => item.uid === uid)) return false
+        let autoAct = uid.endsWith(".")
+        if (autoAct) uid = uid.slice(0, -1)
+        if (this.current.some((item) => item.uid === uid)) return []
         if (this.history.some((item) => item.uid === uid)) {
             this.history.splice(
                 this.history.findIndex((item) => item.uid === uid),
                 1
             )
         }
+        if (autoAct) {
+            this.activities = [
+                // 超过10分钟的活动自动清理
+                ...this.activities.filter((item) => Math.floor(Date.now() / 1000) - item.time < 10 * 60),
+                {
+                    id: nanoid(10),
+                    uid: uid,
+                    owner: user,
+                    req: 0,
+                    users: [user],
+                    time: Math.floor(Date.now() / 1000),
+                },
+            ]
+            this.history = [
+                ...this.history.slice(-9),
+                {
+                    id: nanoid(10),
+                    uid: uid,
+                    user: user,
+                    cookTime: Math.floor(Date.now() / 1000),
+                    cooker: user,
+                    time: Math.floor(Date.now() / 1000),
+                },
+            ]
+            this.count++
+            this.save()
+            return ["activities", "history"] as T[]
+        } else {
+            this.current.push({
+                id: nanoid(10),
+                uid: uid,
+                cookTime: Math.floor(Date.now() / 1000),
+                cooker: user,
+            })
+            this.count++
+            this.save()
+            return ["current"] as T[]
+        }
+    }
+
+    addRichUid(data: ICookData) {
         this.current.push({
             id: nanoid(10),
-            uid: uid,
+            uid: data.uid,
             cookTime: Math.floor(Date.now() / 1000),
-            cooker: user,
+            cooker: data.cooker,
+            // from ICookData
+            img: data.img,
+            name: data.name,
+            sign: data.sign,
+            lv: data.lv,
+            chat: data.chat,
+            status: data.status,
+            tag: data.tag,
         })
         this.count++
         this.save()
-        return false
     }
 
     delUid(uid: string, user = "[bot]") {
@@ -147,14 +209,37 @@ export class Room implements IRoom {
         return true
     }
 
+    clearUid(user = "[bot]") {
+        this.history = [
+            // 保留最近10个uid
+            ...this.history.slice(-10 - this.current.length),
+            ...this.current.map((item) => ({ ...item, user, time: Math.floor(Date.now() / 1000) })),
+        ]
+        this.current = []
+        this.save()
+        return true
+    }
+
+    getCurrent(id: string) {
+        const index = this.current.findIndex((item) => item.id === id)
+        if (index === -1) return null
+        return this.current[index]
+    }
+
+    getAct(id: string) {
+        const index = this.activities.findIndex((item) => item.id === id)
+        if (index === -1) return null
+        return this.activities[index]
+    }
+
     addAct(id: string, user = "[bot]", flag = 0) {
-        const actindex = this.activities.findIndex((item) => item.id === id)
-        if (actindex === -1) {
-            const index = this.current.findIndex((item) => item.id === id)
-            if (index === -1) return false
+        const activity = this.getAct(id)
+        if (!activity) {
+            const current = this.getCurrent(id)
+            if (!current) return false
             const act = {
                 id,
-                uid: this.current[index].uid,
+                uid: current.uid,
                 owner: user,
                 req: 7 ^ flag,
                 users: [user],
@@ -165,16 +250,11 @@ export class Room implements IRoom {
                 ...this.activities.filter((item) => Math.floor(Date.now() / 1000) - item.time < 10 * 60),
                 act,
             ]
-            this.delUid(this.current[index].uid, user)
+            this.delUid(current.uid, user)
             return act
         }
-        const activity = this.activities[actindex]
         if (activity.users.includes(user) || !(!activity.req || activity.req & flag)) return false
         activity.users.push(user)
-        // if (activity.users.length >= 3) {
-        //     this.activities.splice(actindex, 1)
-        //     return activity
-        // }
         activity.req &= ~flag
         this.save()
         return activity

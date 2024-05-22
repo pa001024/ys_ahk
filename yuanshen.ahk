@@ -64,10 +64,25 @@ CapsLock & q:: {
   Sleep 20
   Send "m"
 }
+global _sw_t := false
+; 连跳
+CapsLock & t:: {
+  SetCapsLockState 0
+  global _sw_t
+  _sw_t := !_sw_t
+  if _sw_t {
+    SetTimer(_timer_t, 10)
+  } else {
+    SetTimer(_timer_t, 0)
+  }
+  _timer_t() {
+    Send "{space}"
+  }
+}
 
 
 ; 全自动做饭
-CapsLock & F2:: _auto_cook_sevice()
+; CapsLock & F2:: _auto_cook_sevice()
 
 ; 进地发
 CapsLock & 1:: {
@@ -78,8 +93,8 @@ CapsLock & 1:: {
   API.AddUID(A_Clipboard)
   ; _f3()
 }
-CapsLock & 2:: _auto_msg("我们刷的怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~")
-CapsLock & 3:: _auto_msg("我们三个是一起的，如果显示人数已满麻烦开一下直接加入~")
+CapsLock & 2:: _auto_msg("我们来打怪了，3000摩拉一只，缺摩拉可以来~")
+CapsLock & 3:: _auto_msg("你好，还有人没进来，如果显示人数已满麻烦开一下直接加入~")
 
 ; 私车正常退出
 CapsLock & 4:: {
@@ -199,4 +214,11 @@ F2:: {
   SendEvent "^c"
   _auto_enter()
 }
-#HotIf
+#HotIf WinActive("万民堂")
+MButton:: {
+  Click
+  Sleep 50
+  if RegExMatch(A_Clipboard, "^\d{9}$") {
+    _auto_enter()
+  }
+}

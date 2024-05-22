@@ -18,7 +18,7 @@ class API {
         return StrSplit(httpRequest(url), ",")
     }
     static AddUID(uid) {
-        url := Format(this.baseUrl . 'add/{1:s}?cooker=计数🦈', uid)
+        url := Format(this.baseUrl . 'add/{1:s}?cooker=🦈', uid)
         return StrSplit(httpRequest(url), ",")
     }
     static DelUID(uid) {

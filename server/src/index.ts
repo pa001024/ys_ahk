@@ -1,7 +1,7 @@
 import { Elysia } from "elysia"
 import * as bun from "bun"
 import { staticPlugin } from "@elysiajs/static"
-import { Room } from "./room"
+import { ICookData, Room } from "./room"
 import { WsServer } from "./ws"
 import { watch } from "fs"
 
@@ -20,14 +20,20 @@ io.on("connection", (ws) => {
     })
 
     ws.on("add_uid", (uid: string) => {
-        const isMsg = room.addUid(String(uid), user)
-        ws.broadcast("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
-        ws.reply("update", isMsg ? room.toJSON("msgs") : room.toJSON("current"))
+        const parts = room.addUid(String(uid), user)
+        ws.broadcast("update", room.toJSON(...parts))
+        ws.reply("update", room.toJSON(...parts))
     })
 
     ws.on("del_uid", (uid: string) => {
         room.delUid(uid, user)
         ws.broadcast("update", room.toJSON("current", "history"))
+    })
+
+    ws.on("clear_uid", () => {
+        room.clearUid(user)
+        ws.broadcast("update", room.toJSON("current", "history"))
+        ws.reply("update", room.toJSON("current", "history"))
     })
 
     ws.on("add_act", ({ id, flag }) => {
@@ -44,8 +50,9 @@ io.on("connection", (ws) => {
     })
 
     console.log(`user ${user} joined room ${roomId}`)
-    ws.broadcast("update", room.toJSON("clientCount", "msgs"))
+    ws.broadcast("update", room.toJSON("clientCount", "onlineUsers", "msgs"))
     ws.reply("update", room.toJSON())
+    ws.reply("sync", Date.now() + 300)
 })
 
 watch("./public", { recursive: true }, (rev, filename) => {
@@ -87,12 +94,20 @@ const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
             io.to(room)?.emit("update", r.toJSON("current", "history"))
             return res
         })
-        .get("/act/:id", ({ params: { room, id }, query: { user, req } }) => {
+        .get("/act/:id", ({ params: { room, id }, query: { user, flag } }) => {
             const r = Room.getRoom(room)
             if (!r) return null
-            const res = r.addAct(id, user, req)
+            const res = r.addAct(id, user, flag)
             io.to(room)?.emit("update", r.toJSON("activities"))
             return res
+        })
+        .post("/new", ({ params, body }: { params: { room: string }; body: ICookData }) => {
+            if (!body || typeof body !== "object") return "err"
+            const room = params?.room
+            const r = Room.getRoom(room)!
+            r.addRichUid(body)
+            io.to(room)?.emit("update", r.toJSON("current"))
+            return "ok" //r.toJSON("current")
         })
 
 roomRouter(app) // mount to /

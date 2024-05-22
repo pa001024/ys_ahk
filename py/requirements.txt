@@ -1,0 +1,10 @@
+pywin32
+pyautogui
+pynput
+pyperclip
+opencv-python
+numpy
+pillow
+requests
+rich
+cnocr

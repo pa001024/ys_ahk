@@ -1,0 +1,67 @@
+cooker: 香菱
+endpoint: http://localhost:8887/r/default/
+token: token
+reply:
+  timeout: 30
+  reply_timeout: 50.0
+  rules:
+  - pattern: ^拒绝|别打|不[好可行能要]|^不打?$|no|shg|珊瑚宫|留着|[4四]连|-6|刚打过了|看下?签名
+    reactions:
+    - !Msg 打扰了！
+    case: Failure
+  - pattern: '[那哪][三3]?个|说说看|怎么打|材料|几只|什么|多久|啥|[\?？]$|。。。|\.\.\.'
+    reactions:
+    - !Msg 就是枫丹湖中垂柳右边的地方传奇，每天刷新的~~ 2分钟差不多打完了~
+    case: Idle
+  - pattern: 为什么|怎么不|干[嘛吗]
+    reactions:
+    - !Msg 这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~
+    case: Idle
+  - pattern: 帮我|^帮
+    reactions:
+    - !Msg 要帮忙的话可以让他们帮哦~~
+    case: Idle
+  - pattern: 要帮忙[嘛吗]
+    reactions:
+    - !Msg 不麻烦你了，让他们自己去吧~~
+    case: Idle
+  - pattern: ^你知道
+    reactions:
+    - !Msg 我不知道哦~~你可以问问他们
+    case: Idle
+  - pattern: 没开|没解锁
+    reactions:
+    - !Msg 没事，我看了锚点开了，可以不
+    case: Idle
+  - pattern: 挂\?|开了|大哥|开挂
+    reactions:
+    - !Msg 不会哦，你一会可以看展柜
+    case: Idle
+  - pattern: ^[好哦嗯昂可行来进走去肘中]|没事|无所谓|都[行好可]|[好行拉][的把吧啊]|自[便取]|[打请]去?[便打把吧呗]|打$|随[遍便意]|^1+$|冲冲冲|申请|well|go|en|^o$|欧克|阔以|可以|彳[亍于]|ok|^hao|^keyi|^ky|^qu|^zou|一起|没有?问题|当然|欢迎|天经地义
+    reactions:
+    - !Msg 好的，我先走了，我朋友等会过来~~ 谢谢老板~~
+    - !Emo 1
+    case: Success
+actions:
+  on_enter:
+  - !Delay 4.0
+  - !Emo 2
+  - !Msg '{time}好呀，可以让我朋友进来打3个怪不~~'
+  on_timeout_reply:
+  - !Msg _(:з」∠)_我先走了，行的话一会让他们进吧！
+  on_timeout_noreply:
+  - !Emo 3
+check_map:
+  check: true
+  teleport: false
+  f1_delay: 2.0
+  step_delay: 0.2
+  scroll_delay: 0.5
+  check_delay: 0.5
+f2:
+  check_level: false
+  drag: false
+  level_pattern: 3[0-9]
+  list_delay: 0.03
+  check_sign: true
+  sign_pattern: 挂机|自取|随意
