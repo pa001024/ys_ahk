@@ -26,8 +26,9 @@ io.on("connection", (ws) => {
     })
 
     ws.on("del_uid", (uid: string) => {
-        room.delUid(uid, user)
-        ws.broadcast("update", room.toJSON("current", "history"))
+        const parts = room.delUid(uid, user)
+        ws.broadcast("update", room.toJSON(...parts))
+        ws.reply("update", room.toJSON(...parts))
     })
 
     ws.on("clear_uid", () => {
@@ -84,15 +85,15 @@ const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
             const r = Room.getRoom(room)
             if (!r) return null
             const res = r.addUid(decodeURI(uid), cooker)
-            io.to(room)?.emit("update", r.toJSON("current", "msgs"))
-            return res
+            res.length && io.to(room)?.emit("update", r.toJSON(...res))
+            return "ok"
         })
         .get("/del/:uid", ({ params: { room, uid } }) => {
             const r = Room.getRoom(room)
             if (!r) return null
             const res = r.delUid(uid)
-            io.to(room)?.emit("update", r.toJSON("current", "history"))
-            return res
+            io.to(room)?.emit("update", r.toJSON(...res))
+            return "ok"
         })
         .get("/act/:id", ({ params: { room, id }, query: { user, flag } }) => {
             const r = Room.getRoom(room)
@@ -105,8 +106,8 @@ const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
             if (!body || typeof body !== "object") return "err"
             const room = params?.room
             const r = Room.getRoom(room)!
-            r.addRichUid(body)
-            io.to(room)?.emit("update", r.toJSON("current"))
+            const res = r.addRichUid(body)
+            res.length && io.to(room)?.emit("update", r.toJSON(...res))
             return "ok" //r.toJSON("current")
         })
 

@@ -15,6 +15,11 @@ interface IUIDItem extends Partial<ICookData> {
     cooker: string
 }
 
+interface IPendingItem extends ICookData {
+    id: string
+    cookTime: number
+}
+
 export interface ICookData {
     uid: string
     cooker: string
@@ -23,7 +28,7 @@ export interface ICookData {
     sign: string
     lv: number
     chat: string[]
-    status: "pending" | "rejected" | "accepted"
+    status: "pending" | "rejected" | "success"
     tag: "f2" | "owned" | "auto"
 }
 
@@ -48,6 +53,7 @@ interface IRoomActivity {
 
 interface IRoom {
     current: IUIDItem[]
+    pending: IPendingItem[]
     history: IUIDHistoryItem[]
     count: number
     clientCount: number
@@ -61,6 +67,7 @@ const maskUid = (uid: string) => uid.slice(0, 3) + "***" + uid.slice(6)
 export class Room implements IRoom {
     id = "default"
     current: IUIDItem[] = []
+    pending: IPendingItem[] = []
     history: IUIDHistoryItem[] = []
     count: number = 0
     clientCount: number = 0
@@ -132,6 +139,16 @@ export class Room implements IRoom {
             this.save()
             return ["msgs"] as T[]
         }
+        const index = this.pending.findIndex((item) => item.uid === uid)
+        if (index !== -1) {
+            const item = this.pending[index]
+            this.pending.splice(index, 1)
+            this.current.push({ ...item, status: "success" })
+            this.count++
+            this.save()
+            return ["current", "pending"] as T[]
+        }
+        // 自动进入活动
         let autoAct = uid.endsWith(".")
         if (autoAct) uid = uid.slice(0, -1)
         if (this.current.some((item) => item.uid === uid)) return []
@@ -181,32 +198,63 @@ export class Room implements IRoom {
         }
     }
 
-    addRichUid(data: ICookData) {
-        this.current.push({
-            id: nanoid(10),
-            uid: data.uid,
-            cookTime: Math.floor(Date.now() / 1000),
-            cooker: data.cooker,
-            // from ICookData
-            img: data.img,
-            name: data.name,
-            sign: data.sign,
-            lv: data.lv,
-            chat: data.chat,
-            status: data.status,
-            tag: data.tag,
-        })
-        this.count++
-        this.save()
+    addRichUid<T extends keyof IRoom>(data: ICookData): T[] {
+        if (data.status === "pending" && data.chat.length > 0) {
+            this.pending.push({
+                id: nanoid(10),
+                uid: data.uid,
+                cookTime: Math.floor(Date.now() / 1000),
+                cooker: data.cooker,
+                // from ICookData
+                img: data.img,
+                name: data.name,
+                sign: data.sign,
+                lv: data.lv,
+                chat: data.chat,
+                status: data.status,
+                tag: data.tag,
+            })
+            this.save()
+            return ["pending"] as T[]
+        }
+        if (data.status === "success") {
+            this.current.push({
+                id: nanoid(10),
+                uid: data.uid,
+                cookTime: Math.floor(Date.now() / 1000),
+                cooker: data.cooker,
+                // from ICookData
+                img: data.img,
+                name: data.name,
+                sign: data.sign,
+                lv: data.lv,
+                chat: data.chat,
+                status: data.status,
+                tag: data.tag,
+            })
+            this.count++
+            this.save()
+            return ["current"] as T[]
+        }
+        return [] as T[]
     }
 
-    delUid(uid: string, user = "[bot]") {
+    delUid<T extends keyof IRoom>(uid: string, user = "[bot]"): T[] {
+        {
+            const index = this.pending.findIndex((item) => item.uid === uid)
+            if (index !== -1) {
+                this.pending.splice(index, 1)
+                this.save()
+                return ["pending"] as T[]
+            }
+        }
+
         const index = this.current.findIndex((item) => item.uid === uid)
-        if (index === -1) return false
+        if (index === -1) return []
         while (this.history.length >= 10) this.history.pop()
         this.history.unshift(...this.current.splice(index, 1).map((item) => ({ ...item, user, time: Math.floor(Date.now() / 1000) })))
         this.save()
-        return true
+        return ["current", "history"] as T[]
     }
 
     clearUid(user = "[bot]") {
@@ -273,8 +321,9 @@ export class Room implements IRoom {
         const data: IRoom = {
             clientCount: this.clientCount,
             maxClient: this.maxClient,
-            current: this.current.map((item) => ({ ...item, uid: maskUid(item.uid) })),
-            history: this.history.map((item) => ({ ...item, uid: maskUid(item.uid) })),
+            current: this.current.map(({ img, ...item }) => ({ ...item, uid: maskUid(item.uid) })),
+            history: this.history.map(({ img, ...item }) => ({ ...item, uid: maskUid(item.uid) })),
+            pending: this.pending,
             count: this.count,
             msgs: this.msgs,
             onlineUsers: this.onlineUsers,
@@ -291,6 +340,7 @@ export class Room implements IRoom {
             maxClient: this.maxClient,
             current: this.current,
             history: this.history,
+            pending: this.pending,
             count: this.count,
             msgs: this.msgs,
             activities: this.activities,
@@ -321,6 +371,7 @@ export class Room implements IRoom {
             this.maxClient = obj.maxClient || []
             this.current = obj.current || []
             this.history = obj.history || []
+            this.pending = obj.pending || []
             this.count = obj.count || 0
             this.msgs = obj.msgs || []
             this.activities = obj.activities || []

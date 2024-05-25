@@ -215,8 +215,6 @@ impl<'a> Cooker<'a> {
                     if self.cfg.check_map.check {
                         self.ctl.PressKey("f1");
                     } else {
-                        self.start_time = Instant::now();
-                        self.data = CookData::new(&self.cfg.cooker);
                         self.step = Step::AutoReply;
                     }
                 }
@@ -225,6 +223,9 @@ impl<'a> Cooker<'a> {
                     self.WaitState(GameState::Chat, 2.0);
                     let actions = self.cfg.actions.on_enter.clone();
                     self.PlayActions(&actions);
+                    self.start_time = Instant::now();
+                    self.reply_actions = vec![];
+                    self.data = CookData::new(&self.cfg.cooker);
                 }
                 _ => self.ctl.PressKey("f2"),
             },
@@ -271,14 +272,14 @@ impl<'a> Cooker<'a> {
                     let rst = self.ctl.CheckColor(1219, 367, "E.E.E.");
                     self.log(format!("{}: {rst}", style("AutoCheckMap").green()));
                     self.step = if rst { Step::AutoReply } else { Step::Exit };
-                    self.start_time = Instant::now();
-                    self.data = CookData::new(&self.cfg.cooker);
-                    if rst && self.cfg.check_map.teleport {
-                        self.ctl.Click(1219, 367);
-                        sleepf(self.cfg.check_map.step_delay);
-                        self.ctl.Click(1227, 839);
-                        sleepf(self.cfg.check_map.step_delay);
-                        return;
+                    if rst {
+                        if self.cfg.check_map.teleport {
+                            self.ctl.Click(1219, 367);
+                            sleepf(self.cfg.check_map.step_delay);
+                            self.ctl.Click(1227, 839);
+                            sleepf(self.cfg.check_map.step_delay);
+                            return;
+                        }
                     }
                 }
                 self.ctl.PressKey("esc")
@@ -385,53 +386,46 @@ impl<'a> Cooker<'a> {
                 return;
             }
             // 识别文字
-            let rst = self
-                .ctl
-                .PixelSearchRev((x, py + 42, x + 490, py + 42 + 32), 0xFFFFFF, 0.03);
-            if rst.is_none() {
-                y = py + 119;
-                continue;
-            }
-            let (px, _) = rst.unwrap();
-            let text = self.RecognizeText((x, py + 42, px + 15, py + 42 + 32));
-            if text.len() > 0 {
-                if self.data.chat.contains(&text) {
-                    y = py + 119;
-                    continue;
-                }
-                let rules = self
-                    .cfg
-                    .reply
-                    .rules
-                    .iter()
-                    .position(|rule| is_match(text.as_str(), rule.pattern.as_str()));
-                if rules.is_some() || is_match(text.as_str(), "^[0-9a-zA-Z]{1,4}$") {
-                    // 过滤一些置信度比较低的字符
-                    self.data.chat.push(text.clone());
-                    self.log(format!("{}: {}", style("RecognizeText").green(), text));
-                }
-                if let Some(index) = rules {
-                    let rule = &self.cfg.reply.rules[index];
-                    if self.reply_actions.contains(&index) {
-                        y = py + 119;
-                        continue;
+            if let Some((px, _)) =
+                self.ctl
+                    .PixelSearchRev((x, py + 42, x + 490, py + 42 + 32), 0xFFFFFF, 0.03)
+            {
+                let text = self.RecognizeText((x, py + 42, px + 15, py + 42 + 32));
+                if text.len() > 0 && !self.data.chat.contains(&text) {
+                    let rules = self
+                        .cfg
+                        .reply
+                        .rules
+                        .iter()
+                        .position(|rule| is_match(text.as_str(), rule.pattern.as_str()));
+                    if rules.is_some() || is_match(text.as_str(), "^[0-9a-zA-Z]{1,4}$") {
+                        // 过滤一些置信度比较低的字符
+                        self.data.chat.push(text.clone());
+                        self.log(format!("{}: {}", style("RecognizeText").green(), text));
                     }
-                    self.reply_actions.push(index);
-                    match rule.case {
-                        Case::Success => {
-                            self.reply_state = ReplyState::Success;
-                            self.step = Step::Finish;
-                            self.data.status = "success".to_string();
+                    if let Some(index) = rules {
+                        let rule = &self.cfg.reply.rules[index];
+                        if self.reply_actions.contains(&index) {
+                            y = py + 119;
+                            continue;
                         }
-                        Case::Failure => {
-                            self.reply_state = ReplyState::Fail;
-                            self.step = Step::Finish;
-                            self.data.status = "reject".to_string();
+                        self.reply_actions.push(index);
+                        match rule.case {
+                            Case::Success => {
+                                self.reply_state = ReplyState::Success;
+                                self.step = Step::Finish;
+                                self.data.status = "success".to_string();
+                            }
+                            Case::Failure => {
+                                self.reply_state = ReplyState::Fail;
+                                self.step = Step::Finish;
+                                self.data.status = "reject".to_string();
+                            }
+                            Case::Idle => {}
                         }
-                        Case::Idle => {}
+                        let actions = rule.reactions.clone();
+                        self.PlayActions(&actions);
                     }
-                    let actions = rule.reactions.clone();
-                    self.PlayActions(&actions);
                 }
             }
             y = py + 119
@@ -565,7 +559,7 @@ impl<'a> Cooker<'a> {
             self.data.lv = lv;
         }
         self.data.name = self.RecognizeText((461, 377, 623, 409));
-        if self.reply_state == ReplyState::Timeout {
+        if self.reply_state == ReplyState::Timeout && self.data.chat.len() == 0 {
             if !self.cfg.f2.check_sign || !is_match(&sign, self.cfg.f2.sign_pattern.as_str()) {
                 return;
             }

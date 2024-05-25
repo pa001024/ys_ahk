@@ -26,7 +26,7 @@
                 <div class="uid-list">
                     <transition-group name="list" tag="ul">
                         <li
-                            class="ys-list-item"
+                            class="ys-list-item hover-scale"
                             v-for="item in (follow.user && follow.enable ? room.activities.filter(activity => activity.owner === follow.user || activity.users.includes(follow.user)) : [...room.activities, ...room.current])"
                             :key="item.id"
                             :style="{ '--h': idToColor(item.id) }"
@@ -40,6 +40,16 @@
                                     {{ item.owner || item.cooker }}
                                 </div>
                                 <div class="uid">UID: {{ item.users?.includes(player.name) ? item.uid : maskUid(item.uid) }}</div>
+                                <div class="uid-hover" v-if="player.name === item.owner && item.status === 'success'">
+                                    <div class="uid-img" v-if="item.img"><img :src="'data:image/png;base64,' + item.img" alt="uid" /></div>
+                                    <div class="level"><b>Lv. </b>{{ item.lv }}</div>
+                                    <div class="name"><b>昵称: </b>{{ item.name }}</div>
+                                    <div class="sign"><b>签名: </b>{{ item.sign }}</div>
+                                    <div class="chat">
+                                        对话内容:
+                                        <div class="chat-item" v-for="(chat, index) in item.chat" :key="index">{{chat}}</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="detail">
                                 <ul class="users">
@@ -60,19 +70,46 @@
                                 </button>
                             </div>
                         </li>
+                        <li v-for="item in room.pending" :key="item.id" class="ys-list-item" :style="{ '--h': idToColor(item.id) }">
+                            <div class="content">
+                                <div class="cooker">
+                                    <div class="tag pending">未确认</div>
+                                    {{ item.cooker }}
+                                </div>
+                                <div class="uid">UID: {{ item.uid }}</div>
+                                <div class="uid-hover">
+                                    <div class="uid-img" v-if="item.img"><img :src="'data:image/png;base64,' + item.img" alt="uid" /></div>
+                                    <div class="level"><b>Lv. </b>{{ item.lv }}</div>
+                                    <div class="name"><b>昵称: </b>{{ item.name }}</div>
+                                    <div class="sign"><b>签名: </b>{{ item.sign }}</div>
+                                    <div class="chat">
+                                        对话内容:
+                                        <div class="chat-item" v-for="(chat, index) in item.chat" :key="index">{{chat}}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="detail">
+                                <ul class="users"></ul>
+                                <div class="time">⏳{{ formatTime(item.cookTime) }}</div>
+                            </div>
+                            <div class="ys-btn-group">
+                                <button type="button" class="ys-btn" @click="removeUid(item.uid)">忽略</button>
+                                <button type="button" class="ys-btn checked" @click="addUid(item.uid)">确认</button>
+                            </div>
+                        </li>
                     </transition-group>
                 </div>
                 <div class="follow" v-if="follow.user && follow.enable">
                     已隐藏除{{ follow.user }}外的其他匹配
-                    <button type="button" class="ys-btn" @click="follow.enable = false">取消</button>
+                    <button type="button" class="ys-btn xs" @click="follow.enable = false">取消</button>
                 </div>
                 <div class="follow" v-if="follow.user && nowSeconds < follow.time && !follow.enable">
                     是否关注{{ follow.user }}
-                    <button type="button" class="ys-btn" @click="follow.enable = true">关注</button>
+                    <button type="button" class="ys-btn xs" @click="follow.enable = true">关注</button>
                 </div>
                 <div class="follow" v-if="nowSeconds < count.tip && count.value < 0">
                     开启自动计数
-                    <button type="button" class="ys-btn" @click="count.value = 1">开启</button>
+                    <button type="button" class="ys-btn xs" @click="count.value = 1">开启</button>
                 </div>
 
                 <div class="msg-list flex-1">
@@ -125,6 +162,7 @@
                 </div>
                 <input v-if="formRoomType === 'private'" class="ys-input" type="text" v-model="formRoomId" placeholder="房间号" />
                 <button type="button" class="ys-btn" @click="joinRoom">加入</button>
+                <a href="https://beian.miit.gov.cn" target="_blank">浙ICP备2024097919号-1</a>
             </article>
         </div>
     </body>
@@ -141,7 +179,7 @@
             }
             reconnect(roomId, playerName) {
                 if (this.ws) this.ws.close()
-                this.ws = new WebSocket(`ws://${location.host}/ws/?room=${roomId}&user=${playerName}`)
+                this.ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/?room=${roomId}&user=${playerName}`)
                 this.ws.onmessage = (event) => {
                     const data = JSON.parse(event.data)
                     if (data.event) {
@@ -202,7 +240,7 @@
             let timeOffset = 0
             setInterval(() => (nowSeconds.value = ~~((Date.now() + timeOffset) / 1000)), 1e3)
             const newUid = ref("")
-            const room = ref({ current: [], history: [], msgs: [], activities: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
+            const room = ref({ current: [], history: [], pending: [], msgs: [], activities: [], onlineCount: 0, maxClient: 0, uidCount: 0 })
             const follow = ref({ user: "", time: 0, enable: false })
             const count = ref({ tip: 0, ct: false, value: +localStorage.getItem("count") || -1 })
             const updateData = (data) => {
@@ -310,18 +348,11 @@
                 input.remove()
                 if (!result) throw new Error("复制失败")
             }
-            const removeUid = async (index) => {
-                try {
-                    await copyText(room.value.current[index].uid)
-                } catch (e) {
-                    if (!confirm("复制失败，确认要删除吗？")) return
-                }
-                const uid = room.value.current.splice(index, 1)
-                room.value.history.unshift({ uid: uid[0].uid, time: uid[0].time })
+            const removeUid = async (uid) => {
                 if (socket.id) {
-                    socket.emit("del_uid", uid[0].uid)
+                    socket.emit("del_uid", uid)
                 } else {
-                    await fetch(baseURL + "del/" + uid[0].uid)
+                    await fetch(baseURL + "del/" + uid)
                 }
             }
 
@@ -599,7 +630,7 @@
         margin: 60rem auto;
         display: flex;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
         justify-content: center;
         padding: 20rem;
         height: calc(100vh - 120rem);
@@ -618,11 +649,6 @@
         transition: background 0.3s ease;
         transition-property: background, color;
         box-shadow: 0 0 3rem rgba(0, 0, 0, 0.5);
-    }
-
-    .welcome .ys-btn,
-    .welcome .ys-input {
-        width: calc(100% - 80rem);
     }
 
     .ys-input::placeholder {
@@ -674,9 +700,10 @@
     .ys-btn-group {
         display: flex;
         justify-content: space-between;
-        width: calc(100% - 80rem);
+        padding: 0 10rem;
     }
     .ys-btn-group .ys-btn {
+        flex: 1;
         padding: 0 20rem;
         height: 40rem;
         margin: 10rem 0;
@@ -730,6 +757,10 @@
         box-shadow: 0 0 10rem var(--ys-color-primary);
     }
 
+    .ys-btn.xs {
+        transform: scale(0.6);
+    }
+
     .ys-btn[disabled] {
         pointer-events: none;
         user-select: none;
@@ -768,6 +799,9 @@
     .tag.joined {
         background-color: rgba(102, 105, 255, 0.5);
     }
+    .tag.pending {
+        background-color: rgba(235, 132, 132, 0.5);
+    }
 
     .ys-list-item:last-child {
         margin-bottom: 0;
@@ -775,7 +809,6 @@
 
     .ys-list-item:hover {
         background-color: var(--ys-color-selected-text);
-        transform: scale(1.03);
         box-shadow: 1rem 1rem 5rem rgba(0, 0, 0, 0.3);
     }
     .ys-list-item.active {
@@ -796,6 +829,24 @@
     }
     .ys-list-item .uid {
         font-size: 14rem;
+    }
+    .ys-list-item .uid-hover {
+        position: absolute;
+        opacity: 0;
+        background-color: var(--ys-color-selected-text);
+        color: var(--ys-color-text);
+        border-radius: 5rem;
+        padding: 10rem 20rem;
+        box-shadow: 1rem 1rem 5rem rgba(0, 0, 0, 0.3);
+        z-index: 999;
+    }
+
+    .ys-list-item:hover .uid-hover {
+        opacity: 1;
+        transition: opacity 0.3s ease;
+    }
+    .uid-hover .chat-item {
+        margin-left: 20rem;
     }
     .ys-list-item .detail {
         font-size: 14rem;
@@ -976,5 +1027,8 @@
     }
     .no-select {
         user-select: none;
+    }
+    .hover-scale:hover {
+        transform: scale(1.03);
     }
 </style>

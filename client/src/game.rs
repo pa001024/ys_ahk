@@ -61,11 +61,11 @@ impl GameControl {
     }
 
     pub fn Send(&self, text: &str) {
-        let old = get_clipboard_text();
+        // let old = get_clipboard_text();
         set_clipboard_text(text);
         combo_key_press(&["ctrl", "v"], 0);
         sleep(100);
-        set_clipboard_text(old.as_str());
+        // set_clipboard_text(old.as_str());
     }
 
     pub fn CheckColor(&self, x: i32, y: i32, color: &str) -> bool {
