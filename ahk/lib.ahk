@@ -64,10 +64,15 @@ SendText2(text) {
 
 req := comObject("WinHttp.WinHttpRequest.5.1")
 httpRequest(url, method := "GET", headers := "", data := "", userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36") {
-  req.Open(method, url, true) ;true 表示异步
-  req.SetRequestHeader("User-Agent", userAgent)
-  req.Send()
-  req.WaitForResponse()
+  try {
+    req.Open(method, url, true) ;true 表示异步
+    req.SetRequestHeader("User-Agent", userAgent)
+    req.Send()
+    req.WaitForResponse()
+  }
+  catch {
+    return ""
+  }
   return req.ResponseText
 }
 
@@ -216,148 +221,115 @@ class imageutil
   }
 }
 ;----------------------------------------------------------------------------------------------------------image GDI+工具类
-;----------------------------------------------------------------------------------------------------------JSON工具类
-;可以用于把comobject对象转换为ahk对象
-class JSON2
-{
-  static uuidA := "0763C49802734108979739D89C0CC7A4" . A_NowUTC
-  static uuidB := "C8C0655017FB428FB18EECF88E6E85CF" . A_NowUTC
-  static uuidC := "08E3043B62324D0C8BDDB6A2A1DB4E6A" . A_NowUTC
-  ;解析json
-  static parse(str)
-  {
-    str := inStr(str, '\\') ? strReplace(str, '\\', this.uuidC) : str ;替换 \\
-    str := inStr(str, '\"') ? strReplace(str, '\"', this.uuidA) : str ;替换 \"
-    str := inStr(str, "'") ? strReplace(str, "'", this.uuidB) : str   ;替换 '
-    return this.recurve(str)
-  }
-  ;Func 把对象转换为字符串
-  static stringify(obj)
-  {
-    return this.GetJS().JSON.stringify(obj)
-  }
-  ;递归解析json
-  static recurve(str, recFlag := 0)
-  {
-    static eval := ObjBindMethod(this.GetJS(), 'eval')
-    if not recFlag {
-      obj := eval(Format('(function(){obj=JSON.parse({1}{2}{3});tmp=obj.length?"":obj["keys"]=Object.keys(obj);return obj})()'
-        , "'", str, "'"))
-      return this.recurve(obj, 1)
-    }
-    if (type(str) == "ComObject") {
-      if (str.hasOwnProperty("length")) { ;数组
-        tmpArr := []
-        Loop str.length {
-          if type(value := str.%A_index - 1%) == "ComObject"
-            tmpArr.push(this.recurve(this.recurve(this.stringify(value), 0), 1))
-          else
-            tmpArr.push(this.recurve(value, 1))
-        }
-        return tmpArr
-      } else {  ;对象 注意js的下标是0开始
-        tmpObject := {}
-        Loop str.keys.length {
-          key := str.keys.%A_index - 1%
-          if type(value := str.%key%) == "ComObject" {
-            tmpObject.%key% := this.recurve(this.recurve(this.stringify(value), 0), 1)
-          } else
-            tmpObject.%key% := this.recurve(value, 1) ;
-        }
-        return tmpObject
+class JSON {
+  static parse(str) {
+    static q := Chr(34)
+      , op := ""
+      , vMap := "Map"
+      , vTrue := %vMap%("json_value", "true", "value", 1)
+      , vFalse := %vMap%("json_value", "false", "value", 0)
+      , vNull := %vMap%("json_value", "null", "value", "")
+    static rep := [["\\", "\u005c"], ["\" q, q], ["\/", "/"]
+      , ["\r", "`r"], ["\n", "`n"], ["\t", "`t"], ["\b", "`b"], ["\f", "`f"]]
+    if !(p := RegExMatch(s, op "[{\[]", &r))
+      return
+    stack := [], result := []
+      , arr := result, isArr := (r[0] = "["), key := (isArr ? 1 : ""), keyok := 0
+    While p := RegExMatch(s, op "\S", &r, p + StrLen(r[0]))
+    {
+      Switch r[0]
+      {
+        Case "{", "[":
+          r1 := []
+            , (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
+            , stack.Push(arr, isArr, key, keyok)
+            , arr := r1, isArr := (r[0] = "["), key := (isArr ? 1 : ""), keyok := 0
+        Case "}", "]":
+          if stack.Length < 4
+            Break
+          keyok := stack.Pop(), key := stack.Pop()
+            , isArr := stack.Pop(), arr := stack.Pop()
+        Case ",":
+          key := (isArr ? key + 1 : ""), keyok := 0
+        Case ":":
+          (!isArr && keyok := 1)
+        Case q:
+          i := p, re := op . q "[^" q "]*" q
+          While (p := RegExMatch(s, re, &r, p + StrLen(r[0]) - 1))
+            && SubStr(StrReplace(r[0], "\\"), -2, 1) = "\"
+          { }  ; 用循环避免正则递归太深
+          if !p
+            Break
+          r1 := SubStr(s, i + 1, p + StrLen(r[0]) - i - 2)
+          if InStr(r1, "\")
+          {
+            For k, v in rep
+              r1 := StrReplace(r1, v[1], v[2])
+            v := "", k := 1
+            While i := RegExMatch(r1, "i)\\u[0-9a-f]{4}", , k)
+              v .= SubStr(r1, k, i - k) . Chr("0x" SubStr(r1, i + 2, 4)), k := i + 6
+            r1 := v . SubStr(r1, k)
+          }
+          if (isArr or keyok)
+          (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
+          else key := r1
+        Default:
+          if RegExMatch(s, op "[^\s{}\[\],:" q "]+", &r, p) != p
+            Break
+          Try r1 := "", r1 := (r[0] == "true" ? vTrue : r[0] == "false" ? vFalse
+            : r[0] == "null" ? vNull : r[0] + 0)
+          (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
       }
-    } else { ;普通类型,可能是已经组装好的map或者是组装好的array
-      ;            msgBox type(str)
-      if type(str) == "Object" or type(str) == "Array"
-        return str
-      str := inStr(str, this.uuidA) ? strReplace(str, this.uuidA, '"') : str
-      str := inStr(str, this.uuidB) ? strReplace(str, this.uuidB, "'") : str
-      str := inStr(str, this.uuidC) ? strReplace(str, this.uuidC, "\") : str
-      return str
     }
+    return result
   }
-  ;获取JS对象
-  static GetJS() {
-    static document := '', JS
-    if !document {
-      document := ComObject('HTMLFILE')
-      document.write('<meta http-equiv="X-UA-Compatible" content="IE=9">')
-      JS := document.parentWindow
-      (document.documentMode < 9 && JS.execScript())
+  static stringify(obj, space := "")
+  {
+    static q := Chr(34)
+      , op := ""
+      , vType := "Type"
+      , vIsNumber := "IsNumber"
+    static rep := [["\\", "\"], ["\" q, q]
+      ;-------------------
+      ; 默认不替换 "/-->\/" 与 html特殊字符 "<、>、&-->\uXXXX"
+      ; , ["\/","/"], ["\u003c","<"], ["\u003e",">"], ["\u0026","&"]
+      ;-------------------
+      , ["\r", "`r"], ["\n", "`n"], ["\t", "`t"], ["\b", "`b"], ["\f", "`f"]]
+    if !IsObject(obj)
+    {
+      if %vIsNumber%(obj)
+        return %vType%(obj) = "String" ? q . obj . q : obj
+      for k, v in rep
+        obj := StrReplace(obj, v[2], v[1])
+      ;-------------------
+      ; 默认不替换 "Unicode字符-->\uXXXX"
+      ; While RegExMatch(obj, op "[^\x20-\x7e]", (V2 ? &r : r))
+      ;   obj:=StrReplace(obj, r[0], Format("\u{:04x}",Ord(r[0])))
+      ;-------------------
+      return q . obj . q
     }
-    return JS
+    isArr := 1
+    for k, v in obj
+      if (k != A_Index) and !(isArr := 0)
+        break
+    if (!isArr and obj.Count = 2) and obj.Has("json_value")
+      and ((k := obj["json_value"]) == "true" or k == "false" or k == "null")
+      return k
+    s := "", NewSpace := space . "    ", f := A_ThisFunc
+    For k, v in obj
+      if !(k = "" or IsObject(k))
+        s .= "`r`n" NewSpace
+          . (isArr ? "" : %f%(k . "") ": ")
+          . %f%(v, NewSpace) . ","
+    s := Trim(s, ",") . "`r`n" space
+    return isArr ? "[" s "]" : "{" s "}"
   }
 }
-;----------------------------------------------------------------------------------------------------------JSON工具类
-;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ak工具类class
-class ak {
-  static clipdataType := 1
-  ;判断是否连接互联网
-  static ConnectedToInternet(flag := 0x40) {
-    Return DllCall("Wininet.dll\InternetGetConnectedState", "Str", flag, "Int", 0)
-  }
-  ;Func 显示网页 WB:activeX句柄 ,content:html内容,path:文件位置,timeout:=300
-  static display(WB, content := "", path := "", timeout := 300)
-  {
-    if not content and not path
-      throw Error("展示html时content和path同时为空")
-    WB.silent := true
-    if (content and not path and count := 1) {
-      while (FileExist(f := Format("{1}\{2}{3}-tmp{4}DELETEME.html", A_Temp, A_TickCount, A_NowUTC, count)))
-        count += 1
-      FileAppend content, f
-    } else if (path and not content)
-      f := path
-    WB.Navigate("file://" . f)
-    while ((WB.readystate != 4) and --timeout > 0)
-      sleep 10
-    return true
-  }
 
-  ;Func 处理在屏幕上显示的位置,返回图像所在x,y
-  static dealshowGui(x, y, w, h, &newX, &newY, gap := 5)
-  {
-    newX := x + w > A_ScreenWidth - gap ? A_ScreenWidth - gap - w : x ;处理右边界
-    newY := y + h > A_ScreenHeight - 20 ? y - 20 - h : y ;处理下边界
-  }
-  ;Func frameShadow 窗口阴影
-  static frameShadow(HGui)
-  {
-    _MARGINS := Buffer(16)
-    NumPut("UInt", 0, _MARGINS, 0), NumPut("UInt", 0, _MARGINS, 4), NumPut("UInt", 1, _MARGINS, 8), NumPut("UInt", 0, _MARGINS, 12)
-    DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", HGui, "UInt", 2, "Int*", 2, "UInt", 4)
-    DllCall("dwmapi\DwmExtendFrameIntoClientArea", "Ptr", HGui, "Ptr", _MARGINS)
-  }
-  ;Func 获取请求头中的数据返回一个obj对象传入一个请求头 map={a:{value:"hello",path:"/" , expires:"Sun, 22 Jan 2023 03:46:59 GMT",size:n},xx:"xxx"}
-  static getHeaderObj(header)
-  {
-    resobj := {}, cookieobj := {}, size := 0
-    Loop parse, header, "`n" {
-      if A_loopField and index := inStr(A_loopField, ":") {
-        key := trim(subStr(A_loopField, 1, index - 1))
-        value := trim(subStr(A_loopField, index + 1))
-        if (key == "Set-Cookie") {
-          lineobj := {}, cookieKey := ""
-          for v in strSplit(value, ";") {
-            if indexb := inStr(v, "=") {
-              a := trim(subStr(v, 1, indexb - 1))
-              b := trim(subStr(v, indexb + 1))
-              A_index == 1 ? ((lineobj.value := b) and (cookieKey := a)) : (lineobj.%a% := b)
-            }
-          }
-          cookieobj.%cookieKey% := lineobj
-          size += 1
-        }
-        cookieobj.size := size
-        resobj.%key% := value
-      }
-    }
-    resobj.cookie := cookieobj
-    return resobj
-  }
-  ;Func 获取时间戳
-  static getTimeStamp() {
-    ; datediff 计算现在的utc时间到unix时间戳的起始时间经过的秒数
-    return DateDiff(A_NowUTC, '19700101000000', 'S') * 1000 + A_MSec
-  }
+ConnectedToInternet(flag := 0x40) {
+  Return DllCall("Wininet.dll\InternetGetConnectedState", "Str", flag, "Int", 0)
+}
+getTimeStamp() {
+  ; datediff 计算现在的utc时间到unix时间戳的起始时间经过的秒数
+  return DateDiff(A_NowUTC, '19700101000000', 'S') * 1000 + A_MSec
 }

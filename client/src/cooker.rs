@@ -220,7 +220,9 @@ impl<'a> Cooker<'a> {
                 }
                 Step::AutoReply => {
                     self.ctl.PressKey("enter");
-                    self.WaitState(GameState::Chat, 2.0);
+                    while !self.WaitState(GameState::Chat, 2.0) {
+                        self.ctl.PressKey("enter");
+                    }
                     let actions = self.cfg.actions.on_enter.clone();
                     self.PlayActions(&actions);
                     self.start_time = Instant::now();
@@ -440,7 +442,7 @@ impl<'a> Cooker<'a> {
 
     pub fn PlayActions(&mut self, actions: &Vec<Action>) {
         let time = get_time_str();
-        for action in actions {
+        for action in actions.iter() {
             match action {
                 Action::Msg(text) => {
                     let text = text.replace("{time}", time.as_str());

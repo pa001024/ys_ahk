@@ -22,6 +22,8 @@ class YSMain {
 
     try TraySetIcon("l.ico")
     this.Load()
+    
+    API.GetUIDList()
   }
 
   static ShowUID() {
@@ -84,16 +86,18 @@ CapsLock & t:: {
 ; 全自动做饭
 ; CapsLock & F2:: _auto_cook_sevice()
 
+
 ; 进地发
 CapsLock & 1:: {
   ; _auto_msg("能让我打个精英怪不 o.0") ; 单刷
   _auto_msg("可以让我的几个朋友进来打下枫丹传奇不 ~~ ") ; 一般
   A_Clipboard := _copy_uid()
   ; _auto_send()
-  API.AddUID(A_Clipboard)
+  Sleep 5000
+  API.AddUID(A_Clipboard . ".")
   ; _f3()
 }
-CapsLock & 2:: _auto_msg("我们来打怪了，3000摩拉一只，缺摩拉可以来~")
+CapsLock & 2:: _auto_msg("你好，我们来打怪了~")
 CapsLock & 3:: _auto_msg("你好，还有人没进来，如果显示人数已满麻烦开一下直接加入~")
 
 ; 私车正常退出
@@ -101,7 +105,17 @@ CapsLock & 4:: {
   _auto_msg("<散olor=#E99697>拜拜~祝你游戏愉快</散olor>")
   _auto_exit()
   t := YSCounter.counter_last_update_time
+  ; YSCounter.Add(2)
   YSCounter.Add(4)
+  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(A_TickCount - t)))
+}
+
+; 私车路2
+F4:: {
+  ; _auto_msg("<散olor=#E99697>拜拜~祝你游戏愉快</散olor>")
+  _auto_exit()
+  t := YSCounter.counter_last_update_time
+  YSCounter.Add(2)
   API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(A_TickCount - t)))
 }
 
@@ -116,81 +130,11 @@ CapsLock & Numpad7:: YSCounter.Add(7)
 CapsLock & Numpad8:: YSCounter.Add(8)
 CapsLock & Numpad9:: YSCounter.Add(9)
 CapsLock & Numpad0:: YSCounter.Add(-1)
-; 传送利亚姆
-F3:: {
-  Send "{F1}"
-  Sleep 800
-  Click 247, 455 ; 讨伐
-  Sleep 50
-  Click 474, 171 ; 全部
-  Sleep 50
-  Click 466, 357 ; 首领
-  Sleep 50
-  Click 797, 701 ; 滚动条
-  Sleep 50
-  Click 797, 701 ; 滚动条
-  Sleep 300
-  Click 421, 364 ; 冰风
-  Sleep 1
-  Click 1212, 700 ; 取消追踪
-  Sleep 1
-  Click 1212, 700 ; 追踪
-  Sleep 600
-  Click 1218, 364 ; 锚点
-  Sleep 50
-  Click 1233, 839 ; 传送
-}
-; 打完拳皇传送2
-F5:: {
-  ; 全自动1
-  Send "{F1}"
-  Sleep 800
-  Click 247, 455 ; 讨伐
-  Sleep 50
-  Click 717, 592 ; 猊兽
-  Sleep 1
-  Click 1212, 700 ; 取消追踪
-  Sleep 1
-  Click 1212, 700 ; 追踪
-  Sleep 300
-  Click 995, 358 ; 锚点
-  Sleep 50
-  Click 1233, 839 ; 传送
-  ; 全自动2
-  ; Send "{F1}"
-  ; Sleep 400
-  ; Click 247, 455 ; 讨伐
-  ; Sleep 50
-  ; Click 474, 171 ; 全部
-  ; Sleep 1
-  ; Click 466, 357 ; 首领
-  ; Sleep 1
-  ; Click 725, 429 ; 纯水
-  ; Sleep 1
-  ; Click 1212, 700 ; 取消追踪
-  ; Sleep 1
-  ; Click 1212, 700 ; 追踪
-  ; Sleep 100
-  ; Click 38, 542 ; -
-  ; Sleep 100
-  ; Click 108, 535 ; 锚点
-  ; Sleep 80
-  ; Click 1233, 839 ; 传送
-  ; 半自动
-  ; Send "m"
-  ; Sleep 750
-  ; Click 1029, 893, "Down"
-  ; loop {
-  ;   mouseXY(-16, -22)
-  ;   Sleep 2
-  ;   if A_Index > 22
-  ;     break
-  ; }
-  ; Click "Up"
-  ; Click 580, 544, 0
-}
+
+F3:: _tp_f1(421, 364, 1218, 364) ; 传送利亚姆
+F5:: _tp_f1(718, 500, 995, 358) ; 传送龙溪
 ; 发地
-F4:: A_Clipboard := _copy_uid()
+; F4:: A_Clipboard := _copy_uid()
 
 
 ; 一键登录
@@ -214,10 +158,25 @@ F2:: {
   SendEvent "^c"
   _auto_enter()
 }
-#HotIf WinActive("万民堂")
+#HotIf WinActive("自助餐")
 MButton:: {
+  global last_uid
   Click
   Sleep 50
+  if WinActive("自助餐") and RegExMatch(A_Clipboard, "^\d{9}$") {
+    last_uid := A_Clipboard
+    _auto_enter()
+  }
+}
+
+last_uid := ""
+#HotIf WinActive("原神")
+~F2:: {
+  global last_uid
+  if A_Clipboard == last_uid {
+    return true
+  }
+  last_uid := A_Clipboard
   if RegExMatch(A_Clipboard, "^\d{9}$") {
     _auto_enter()
   }

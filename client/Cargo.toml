@@ -7,9 +7,9 @@ build = "src/build.rs"
 [dependencies]
 encoding = "0.2.33"
 regex = "1.10"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-serde_json = "1.0"
+serde_json = "1"
 image = "0.25"
 imageproc = "0.25"
 console = "0.15"
@@ -22,7 +22,6 @@ chrono = "0.4"
 template-matching = { version = "0.2.0", features = ["image"] }
 # opencv = { version = "0.91", default-features = false, features = ["imgproc"] }
 # paddle的依赖
-# rand = "0.8.5"
 # ndarray = "0.15.6"
 # ort = "2.0.0-rc.2"
 # thiserror = "1.0.30"
@@ -43,3 +42,6 @@ features = [
 
 [build-dependencies]
 winres = "0.1"
+
+[profile.release]
+panic = 'abort'

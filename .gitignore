@@ -13,3 +13,5 @@ server/rooms/
 target/
 tauri-app/
 client/models/
+*.exe
+orttest/

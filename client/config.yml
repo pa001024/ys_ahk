@@ -1,5 +1,5 @@
-cooker: 香菱
-endpoint: http://localhost:8887/r/default/
+cooker: 小🦈
+endpoint: https://xn--chq26veyq.icu/r/default/
 token: token
 reply:
   timeout: 30
@@ -16,6 +16,14 @@ reply:
   - pattern: 为什么|怎么不|干[嘛吗]
     reactions:
     - !Msg 这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~
+    case: Idle
+  - pattern: 自己来
+    reactions:
+    - !Msg 那个, 因为一起申请也不方便呀
+    case: Idle
+  - pattern: 自己世界
+    reactions:
+    - !Msg 那个, 因为每天要打400个怪，自己世界肯定是不够的呀~~
     case: Idle
   - pattern: 帮我|^帮
     reactions:
@@ -39,21 +47,21 @@ reply:
     case: Idle
   - pattern: ^[好哦嗯昂可行来进走去肘中]|没事|无所谓|都[行好可]|[好行拉][的把吧啊]|自[便取]|[打请]去?[便打把吧呗]|打$|随[遍便意]|^1+$|冲冲冲|申请|well|go|en|^o$|欧克|阔以|可以|彳[亍于]|ok|^hao|^keyi|^ky|^qu|^zou|一起|没有?问题|当然|欢迎|天经地义
     reactions:
-    - !Msg 好的，我先走了，我朋友等会过来~~ 谢谢老板~~
+    - !Msg 好的，我先走了，我朋友等会过来~~ 人多容易卡最好开个自动 谢谢老板~~
     - !Emo 1
     case: Success
 actions:
   on_enter:
-  - !Delay 4.0
   - !Emo 2
-  - !Msg '{time}好呀，可以让我朋友进来打3个怪不~~'
+  - !Delay 3
+  - !Msg '{time}好呀，我有3个朋友想一起打怪，能让他们进来不~~'
   on_timeout_reply:
   - !Msg _(:з」∠)_我先走了，行的话一会让他们进吧！
   on_timeout_noreply:
   - !Emo 3
 check_map:
   check: true
-  teleport: false
+  teleport: true
   f1_delay: 2.0
   step_delay: 0.2
   scroll_delay: 0.5
@@ -61,7 +69,7 @@ check_map:
 f2:
   check_level: false
   drag: false
-  level_pattern: 3[0-9]
+  level_pattern: 4[0-9]
   list_delay: 0.03
   check_sign: true
   sign_pattern: 挂机|自取|随意

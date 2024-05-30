@@ -5,7 +5,7 @@ class YSCounter {
     static oGui := this.InitGui()
     static visible := false
     static counter := 0
-    static counter_last_update_time := A_TickCount
+    static counter_last_update_time := getTimeStamp()
 
     ; 加载计数器的初始状态
     static Load() {
@@ -13,7 +13,7 @@ class YSCounter {
         this.counter := IniRead("ys-ahk.ini", "counter", "value", 0)
         this.oGui["Val"].value := String(this.counter)
         this.oGui["Time"].value := IniRead("ys-ahk.ini", "counter", "time1", "+0:00:00.000") . Chr(10) . IniRead("ys-ahk.ini", "counter", "time2", "+0:00:00.000")
-        this.counter_last_update_time := IniRead("ys-ahk.ini", "counter", "counter_last_update_time", A_TickCount)
+        this.counter_last_update_time := IniRead("ys-ahk.ini", "counter", "counter_last_update_time", getTimeStamp())
     }
 
     ; 初始化GUI窗口
@@ -60,16 +60,16 @@ class YSCounter {
         if r == 0 {
             this.counter := 0
             this.oGui["Val"].value := String(this.counter)
-            this.counter_last_update_time := A_TickCount
+            this.counter_last_update_time := getTimeStamp()
             this.Save()
             return
         }
         this.counter := this.counter + r
         this.oGui["Val"].value := String(this.counter)
-        if r > 0 and A_TickCount - this.counter_last_update_time > 5000 {
+        if r > 0 and getTimeStamp() - this.counter_last_update_time > 5000 {
             old := StrSplit(this.oGui["Time"].value, Chr(10))
-            this.oGui["Time"].value := old[2] . Chr(10) . format_time_diff(A_TickCount - this.counter_last_update_time)
-            this.counter_last_update_time := A_TickCount
+            this.oGui["Time"].value := old[2] . Chr(10) . format_time_diff(getTimeStamp() - this.counter_last_update_time)
+            this.counter_last_update_time := getTimeStamp()
         }
         this.Save()
     }

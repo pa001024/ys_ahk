@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid"
 import * as fs from "fs"
+import { EventEmitter } from "events"
 
 interface IMessage {
     id: string
@@ -42,7 +43,7 @@ interface IRoomOnlineUser {
     time: number
 }
 
-interface IRoomActivity {
+export interface IRoomActivity {
     id: string
     uid: string
     owner: string
@@ -51,6 +52,9 @@ interface IRoomActivity {
     time: number
 }
 
+export const modes = ["normal", "melt"] as const
+type Mode = (typeof modes)[number]
+
 interface IRoom {
     current: IUIDItem[]
     pending: IPendingItem[]
@@ -58,13 +62,14 @@ interface IRoom {
     count: number
     clientCount: number
     maxClient: number
+    mode: Mode
     msgs: IMessage[]
     onlineUsers: { [key: string]: IRoomOnlineUser }
     activities: IRoomActivity[]
 }
 const maskUid = (uid: string) => uid.slice(0, 3) + "***" + uid.slice(6)
 
-export class Room implements IRoom {
+export class Room extends EventEmitter implements IRoom {
     id = "default"
     current: IUIDItem[] = []
     pending: IPendingItem[] = []
@@ -72,10 +77,12 @@ export class Room implements IRoom {
     count: number = 0
     clientCount: number = 0
     maxClient: number = 50
+    mode: Mode = "normal"
     msgs: IMessage[] = []
     onlineUsers: { [key: string]: IRoomOnlineUser } = {}
     activities: IRoomActivity[] = []
     constructor(id = "default") {
+        super()
         if (!fs.existsSync("rooms")) fs.mkdirSync("rooms", { recursive: true })
         this.id = id
         this.load()
@@ -101,44 +108,56 @@ export class Room implements IRoom {
                 time: Math.floor(Date.now() / 1000),
             },
         ]
+        this.emit("join", user)
         return true
     }
     leave(user: string) {
         this.clientCount--
         if (user in this.onlineUsers) {
             this.onlineUsers[user].ref--
-            if (this.onlineUsers[user].ref <= 0) {
-                delete this.onlineUsers[user]
-                this.msgs = [
-                    ...this.msgs.filter((item) => item.user !== user || item.text !== "<leave>").slice(-19),
-                    {
-                        id: nanoid(10),
-                        user: user,
-                        text: "<leave>",
-                        time: Math.floor(Date.now() / 1000),
-                    },
-                ]
-            }
+            setTimeout(() => {
+                if (this.onlineUsers[user]?.ref <= 0) {
+                    delete this.onlineUsers[user]
+                    this.msgs = [
+                        ...this.msgs.filter((item) => item.user !== user || item.text !== "<leave>").slice(-19),
+                        {
+                            id: nanoid(10),
+                            user: user,
+                            text: "<leave>",
+                            time: Math.floor(Date.now() / 1000),
+                        },
+                    ]
+                    this.emit("leave", user)
+                }
+            }, 30e3)
         }
     }
     setMaxClient(count: number) {
         this.maxClient = count
+        this.emit("max_client_change", count)
         this.save()
     }
+    setMode(mode: Mode) {
+        this.mode = mode
+        this.emit("mode_change", mode)
+        this.save()
+    }
+
     addUid<T extends keyof IRoom>(uid: string, user = "[bot]"): T[] {
+        if (typeof uid !== "string") uid = String(uid)
         if (!/^\d{9}\.?$/.test(uid)) {
-            this.msgs = [
-                ...this.msgs.slice(-19),
-                {
-                    id: nanoid(10),
-                    user: user,
-                    text: uid.slice(0, 40),
-                    time: Math.floor(Date.now() / 1000),
-                },
-            ]
+            const msg = {
+                id: nanoid(10),
+                user: user,
+                text: uid.slice(0, 40),
+                time: Math.floor(Date.now() / 1000),
+            }
+            this.msgs = [...this.msgs.slice(-19), msg]
             this.save()
+            this.emit("msg", msg)
             return ["msgs"] as T[]
         }
+
         const index = this.pending.findIndex((item) => item.uid === uid)
         if (index !== -1) {
             const item = this.pending[index]
@@ -146,11 +165,13 @@ export class Room implements IRoom {
             this.current.push({ ...item, status: "success" })
             this.count++
             this.save()
+            this.emit("add_uid", item)
             return ["current", "pending"] as T[]
         }
         // 自动进入活动
         let autoAct = uid.endsWith(".")
         if (autoAct) uid = uid.slice(0, -1)
+        if (this.mode === "melt") autoAct = true
         if (this.current.some((item) => item.uid === uid)) return []
         if (this.history.some((item) => item.uid === uid)) {
             this.history.splice(
@@ -159,17 +180,19 @@ export class Room implements IRoom {
             )
         }
         if (autoAct) {
+            if (this.activities.some((item) => item.uid === uid)) return []
+            const act = {
+                id: nanoid(10),
+                uid: uid,
+                owner: user,
+                req: 0,
+                users: [user],
+                time: Math.floor(Date.now() / 1000),
+            }
             this.activities = [
                 // 超过10分钟的活动自动清理
                 ...this.activities.filter((item) => Math.floor(Date.now() / 1000) - item.time < 10 * 60),
-                {
-                    id: nanoid(10),
-                    uid: uid,
-                    owner: user,
-                    req: 0,
-                    users: [user],
-                    time: Math.floor(Date.now() / 1000),
-                },
+                act,
             ]
             this.history = [
                 ...this.history.slice(-9),
@@ -184,21 +207,27 @@ export class Room implements IRoom {
             ]
             this.count++
             this.save()
+            this.emit("add_act", act)
             return ["activities", "history"] as T[]
         } else {
-            this.current.push({
+            const item = {
                 id: nanoid(10),
                 uid: uid,
                 cookTime: Math.floor(Date.now() / 1000),
                 cooker: user,
-            })
+            }
+            this.current.push(item)
             this.count++
             this.save()
+            this.emit("add_uid", item)
             return ["current"] as T[]
         }
     }
 
     addRichUid<T extends keyof IRoom>(data: ICookData): T[] {
+        if (data.uid.length > 9) {
+            data.uid = data.uid.slice(0, 9)
+        }
         if (data.status === "pending" && data.chat.length > 0) {
             this.pending.push({
                 id: nanoid(10),
@@ -252,7 +281,7 @@ export class Room implements IRoom {
         const index = this.current.findIndex((item) => item.uid === uid)
         if (index === -1) return []
         while (this.history.length >= 10) this.history.pop()
-        this.history.unshift(...this.current.splice(index, 1).map((item) => ({ ...item, user, time: Math.floor(Date.now() / 1000) })))
+        this.history.unshift(...this.current.splice(index, 1).map(({ img, ...item }) => ({ ...item, user, time: Math.floor(Date.now() / 1000) })))
         this.save()
         return ["current", "history"] as T[]
     }
@@ -274,6 +303,10 @@ export class Room implements IRoom {
         return this.current[index]
     }
 
+    getFollowedActivities(user: string) {
+        return this.activities.filter((item) => item.owner === user)
+    }
+
     getAct(id: string) {
         const index = this.activities.findIndex((item) => item.id === id)
         if (index === -1) return null
@@ -283,27 +316,37 @@ export class Room implements IRoom {
     addAct(id: string, user = "[bot]", flag = 0) {
         const activity = this.getAct(id)
         if (!activity) {
-            const current = this.getCurrent(id)
-            if (!current) return false
+            const data = this.getCurrent(id)
+            if (!data) return null
             const act = {
                 id,
-                uid: current.uid,
+                uid: data.uid,
                 owner: user,
                 req: 7 ^ flag,
                 users: [user],
                 time: Math.floor(Date.now() / 1000),
+                // from ICookData
+                img: data.img,
+                name: data.name,
+                sign: data.sign,
+                lv: data.lv,
+                chat: data.chat,
+                status: data.status,
+                tag: data.tag,
             }
             this.activities = [
                 // 超过10分钟的活动自动清理
                 ...this.activities.filter((item) => Math.floor(Date.now() / 1000) - item.time < 10 * 60),
                 act,
             ]
-            this.delUid(current.uid, user)
+            this.emit("new_act", act)
+            this.delUid(data.uid, user)
             return act
         }
-        if (activity.users.includes(user) || !(!activity.req || activity.req & flag)) return false
+        if (activity.users.includes(user) || !(!activity.req || activity.req & flag)) return null
         activity.users.push(user)
         activity.req &= ~flag
+        this.emit("join_act", activity)
         this.save()
         return activity
     }
@@ -314,6 +357,8 @@ export class Room implements IRoom {
         const activity = this.activities[index]
         if (activity.owner !== user) return false
         this.activities.splice(index, 1)
+        this.emit("del_act", activity)
+        this.save()
         return true
     }
 
@@ -321,6 +366,7 @@ export class Room implements IRoom {
         const data: IRoom = {
             clientCount: this.clientCount,
             maxClient: this.maxClient,
+            mode: this.mode,
             current: this.current.map(({ img, ...item }) => ({ ...item, uid: maskUid(item.uid) })),
             history: this.history.map(({ img, ...item }) => ({ ...item, uid: maskUid(item.uid) })),
             pending: this.pending,
@@ -338,6 +384,7 @@ export class Room implements IRoom {
     toJSONServer() {
         return {
             maxClient: this.maxClient,
+            mode: this.mode,
             current: this.current,
             history: this.history,
             pending: this.pending,
@@ -366,17 +413,22 @@ export class Room implements IRoom {
         if (!fs.existsSync("rooms/" + this.id + ".json")) return
         try {
             const json = fs.readFileSync("rooms/" + this.id + ".json", "utf8")
-            const obj = JSON.parse(json)
+            const obj: ReturnType<typeof Room.prototype.toJSONServer> = JSON.parse(json)
 
-            this.maxClient = obj.maxClient || []
+            this.maxClient = obj.maxClient || 50
             this.current = obj.current || []
             this.history = obj.history || []
             this.pending = obj.pending || []
             this.count = obj.count || 0
             this.msgs = obj.msgs || []
             this.activities = obj.activities || []
+            this.mode = obj.mode || "normal"
         } catch (e) {
             console.error(`读取房间数据失败：${this.id}`)
         }
+    }
+
+    on(event: "join" | "leave" | "add_uid" | "new_act" | "join_act" | "del_act" | "mode_change" | "max_client_change", listener: (...args: any[]) => void) {
+        return super.on(event, listener)
     }
 }

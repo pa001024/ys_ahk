@@ -1,17 +1,20 @@
 {
-  "name": "server",
-  "version": "1.0.50",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
-  },
-  "dependencies": {
-    "@elysiajs/static": "^1.0.3",
-    "elysia": "latest",
-    "nanoid": "^5.0.7"
-  },
-  "devDependencies": {
-    "bun-types": "latest"
-  },
-  "module": "src/index.js"
+    "name": "server",
+    "version": "1.0.50",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "bun run --watch src/index.ts",
+        "bu": "bun build browser_src/denoise.ts --outdir public/js/ --minify"
+    },
+    "dependencies": {
+        "@elysiajs/static": "^1.0.3",
+        "@elysiajs/stream": "^1.0.2",
+        "ai-noise-reduction": "^0.0.1",
+        "elysia": "latest",
+        "nanoid": "^5.0.7"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    },
+    "module": "src/index.js"
 }

@@ -466,3 +466,47 @@ _auto_f2() {
             break
     }
 }
+
+_tp_boss_bottom() {
+    while not CheckColor(1391, 195, "D0B8AC") {
+        Send "{F1}"
+        Sleep 20
+        if A_Index > 100 {
+            return
+        }
+    }
+    Click 247, 455 ; 讨伐
+    Sleep 1
+    Click 474, 171 ; 全部
+    Sleep 1
+    Click 466, 357 ; 首领
+    Sleep 1
+    while not CheckColor(798, 687, "FFFFFF") {
+        Click 797, 701 ; 滚动条
+        Sleep 16
+        if A_Index > 9 {
+            return
+        }
+    }
+    Sleep 100
+}
+
+_tp_trace() {
+    loop 2 {
+        Sleep 1
+        Click 1212, 700 ; 追踪
+    }
+    Sleep 150
+}
+
+_tp_f1(x1, y1, x2, y2) {
+    _tp_boss_bottom()
+    Click x1, y1 ; 冰风
+    _tp_trace()
+    loop 5 {
+        Click x2, y2 ; 锚点
+        Sleep 1
+        Click 1233, 839 ; 传送
+        Sleep 99
+    }
+}

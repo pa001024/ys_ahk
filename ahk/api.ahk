@@ -26,8 +26,3 @@ class API {
         return StrSplit(httpRequest(url), ",")
     }
 }
-
-try {
-    API.GetUIDList()
-} catch {
-}

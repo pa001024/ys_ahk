@@ -74,9 +74,9 @@ impl Config {
             token: "token".to_string(),
             actions: ActionsConfig {
                 on_enter: vec![
-                    Action::Delay(4.0),
                     Action::Emo(2),
-                    Action::Msg("{time}好呀，可以让我朋友进来打3个怪不~~".to_string()),
+                    Action::Delay(3.0),
+                    Action::Msg("{time}好呀，我有3个朋友想一起打怪，能让他们进来不~~".to_string()),
                 ],
                 on_timeout_reply: vec![Action::Msg(
                     "_(:з」∠)_我先走了，行的话一会让他们进吧！".to_string(),
@@ -106,6 +106,20 @@ impl Config {
                         pattern: "为什么|怎么不|干[嘛吗]".to_string(),
                         reactions: vec![
                             Action::Msg("这怪有几百万血，不过掉的摩拉也多3000摩拉一只，每天最多120W摩拉~".to_string())
+                        ],
+                        case: Case::Idle,
+                    },
+                    ReplyRule {
+                        pattern: "自己来".to_string(),
+                        reactions: vec![
+                            Action::Msg("那个, 因为一起申请也不方便呀".to_string())
+                        ],
+                        case: Case::Idle,
+                    },
+                    ReplyRule {
+                        pattern: "自己世界".to_string(),
+                        reactions: vec![
+                            Action::Msg("那个, 因为每天要打400个怪，自己世界肯定是不够的呀~~".to_string())
                         ],
                         case: Case::Idle,
                     },
@@ -147,7 +161,7 @@ impl Config {
                     ReplyRule {
                         pattern: "^[好哦嗯昂可行来进走去肘中]|没事|无所谓|都[行好可]|[好行拉][的把吧啊]|自[便取]|[打请]去?[便打把吧呗]|打$|随[遍便意]|^1+$|冲冲冲|申请|well|go|en|^o$|欧克|阔以|可以|彳[亍于]|ok|^hao|^keyi|^ky|^qu|^zou|一起|没有?问题|当然|欢迎|天经地义".to_string(),
                         reactions: vec![
-                            Action::Msg("好的，我先走了，我朋友等会过来~~ 谢谢老板~~".to_string()),
+                            Action::Msg("好的，我先走了，我朋友等会过来~~ 人多容易卡最好开个自动 谢谢老板~~".to_string()),
                             Action::Emo(1),
                         ],
                         case: Case::Success,
