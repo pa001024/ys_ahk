@@ -72,10 +72,17 @@ interface IRoom {
     msgs: IMessage[]
     onlineUsers: { [key: string]: IRoomOnlineUser }
     activities: IRoomActivity[]
+    rtcSessions: { [key: string]: IRtcSession }
 }
 const maskUid = (uid: string) => uid.slice(0, 3) + "***" + uid.slice(6)
 
-export class Room extends EventEmitter implements IRoom {
+type RoomEventTypes = "join" | "leave" | "msg" | "add_uid" | "new_act" | "join_act" | "del_act" | "mode_change" | "max_client_change" | "rtc_joined" | "rtc_leaved"
+interface RoomEventPayload {
+    room: Room
+    data: any
+}
+export class Room implements IRoom {
+    static emitter = new EventEmitter()
     id = "default"
     current: IUIDItem[] = []
     pending: IPendingItem[] = []
@@ -89,7 +96,6 @@ export class Room extends EventEmitter implements IRoom {
     activities: IRoomActivity[] = []
     rtcSessions: { [key: string]: IRtcSession } = {}
     constructor(id = "default") {
-        super()
         if (!fs.existsSync("rooms")) fs.mkdirSync("rooms", { recursive: true })
         this.id = id
         this.load()
@@ -218,7 +224,7 @@ export class Room extends EventEmitter implements IRoom {
             ]
             this.count++
             this.save()
-            this.emit("add_act", act)
+            this.emit("new_act", act)
             return ["activities", "history"] as T[]
         } else {
             const item = {
@@ -385,6 +391,7 @@ export class Room extends EventEmitter implements IRoom {
             msgs: this.msgs,
             onlineUsers: this.onlineUsers,
             activities: this.activities,
+            rtcSessions: this.rtcSessions,
         }
         if (names.length === 0) return data
         const patial: { [key in T]: IRoom[key] } = {} as any
@@ -456,11 +463,26 @@ export class Room extends EventEmitter implements IRoom {
         this.save()
         this.emit("rtc_leaved", session)
     }
-
-    on(
-        event: "join" | "leave" | "msg" | "add_uid" | "new_act" | "join_act" | "del_act" | "mode_change" | "max_client_change" | "rtc_joined" | "rtc_leaved",
-        listener: (...args: any[]) => void
-    ) {
-        return super.on(event, listener)
+    emit(ev: RoomEventTypes, data: any) {
+        Room.emitter.emit(ev, { room: this, data })
+        Room.emitter.emit(this.id + ":" + ev, data)
+    }
+    on(event: RoomEventTypes, listener: (data: any) => void) {
+        return Room.emitter.on(this.id + ":" + event, listener)
+    }
+    once(event: RoomEventTypes, listener: (data: any) => void) {
+        return Room.emitter.once(this.id + ":" + event, listener)
+    }
+    off(event: RoomEventTypes, listener: (data: any) => void) {
+        return Room.emitter.off(this.id + ":" + event, listener)
+    }
+    static on(event: RoomEventTypes, listener: (payload: RoomEventPayload) => void) {
+        return Room.emitter.on(event, listener)
+    }
+    static once(event: RoomEventTypes, listener: (payload: RoomEventPayload) => void) {
+        return Room.emitter.once(event, listener)
+    }
+    static off(event: RoomEventTypes, listener: (payload: RoomEventPayload) => void) {
+        return Room.emitter.off(event, listener)
     }
 }

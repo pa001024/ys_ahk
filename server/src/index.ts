@@ -89,6 +89,8 @@ io.on("connection", (ws) => {
     ws.reply("update", room.toJSON())
 })
 
+Room.on("msg", ({ room, data }) => io.to(room.id)?.emit("msg", data))
+
 const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
     app
         .get("/", () => bun.file("public/index.html"))
@@ -120,7 +122,7 @@ const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
                 stream.close()
                 room.off("new_act", handler)
             }
-            room.on("new_act", handler)
+            room.once("new_act", handler)
             setTimeout(() => {
                 stream.close()
                 room.off("new_act", handler)
