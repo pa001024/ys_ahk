@@ -222,7 +222,7 @@ class imageutil
 }
 ;----------------------------------------------------------------------------------------------------------image GDI+工具类
 class JSON {
-  static parse(str) {
+  static parse(s) {
     static q := Chr(34)
       , op := ""
       , vMap := "Map"
@@ -241,9 +241,9 @@ class JSON {
       {
         Case "{", "[":
           r1 := []
-            , (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
-            , stack.Push(arr, isArr, key, keyok)
-            , arr := r1, isArr := (r[0] = "["), key := (isArr ? 1 : ""), keyok := 0
+          , (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
+          , stack.Push(arr, isArr, key, keyok)
+          , arr := r1, isArr := (r[0] = "["), key := (isArr ? 1 : ""), keyok := 0
         Case "}", "]":
           if stack.Length < 4
             Break
@@ -271,7 +271,7 @@ class JSON {
             r1 := v . SubStr(r1, k)
           }
           if (isArr or keyok)
-          (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
+            (isArr && !keyok ? (arr.Push(r1), keyok := 1) : arr[key] := r1)
           else key := r1
         Default:
           if RegExMatch(s, op "[^\s{}\[\],:" q "]+", &r, p) != p

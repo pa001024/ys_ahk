@@ -3,14 +3,14 @@ import * as bun from "bun"
 import { staticPlugin } from "@elysiajs/static"
 import { ICookData, IRoomActivity, Room } from "./room"
 import { WsServer } from "./ws"
-import { watch } from "fs"
 import { Stream } from "@elysiajs/stream"
+import { hot } from "./hot"
 
 const app = new Elysia().use(staticPlugin({ prefix: "/" }))
 
 const io = new WsServer(app)
 io.on("connection", (ws) => {
-    const { roomId, user } = ws
+    const { id, roomId, user } = ws
     const room = Room.getRoom(roomId)
 
     // 拒绝连接
@@ -19,12 +19,8 @@ io.on("connection", (ws) => {
     ws.on("disconnect", () => {
         console.log(`user ${user} left room ${roomId}`)
         room.leave(user)
-        ws.broadcast("update", room.toJSON("clientCount", "msgs"))
-    })
-
-    ws.on("add_uid", (uid: string) => {
-        const parts = room.addUid(uid, user)
-        ws.emit("update", room.toJSON(...parts))
+        room.leave_rtc(id)
+        ws.broadcast("update", room.toJSON("clientCount", "onlineUsers", "msgs"))
     })
 
     ws.on("set_mode", (mode: string) => {
@@ -34,9 +30,14 @@ io.on("connection", (ws) => {
         }
     })
 
+    ws.on("add_uid", (uid: string) => {
+        const parts = room.addUid(uid, user)
+        parts.length && ws.emit("update", room.toJSON(...parts))
+    })
+
     ws.on("del_uid", (uid: string) => {
         const parts = room.delUid(uid, user)
-        ws.emit("update", room.toJSON(...parts))
+        parts.length && ws.emit("update", room.toJSON(...parts))
     })
 
     ws.on("clear_uid", () => {
@@ -44,6 +45,7 @@ io.on("connection", (ws) => {
         ws.emit("update", room.toJSON("current", "history"))
     })
 
+    // act
     ws.on("add_act", ({ id, flag }) => {
         const act = room.addAct(id, user, flag)
         ws.emit("update", room.toJSON("activities"))
@@ -55,36 +57,36 @@ io.on("connection", (ws) => {
             }, 20e3)
         }
     })
+    ws.on("del_act", ({ id }) => room.delAct(id, user) && ws.emit("update", room.toJSON("activities")))
 
-    ws.on("del_act", ({ id }) => {
-        if (room.delAct(id, user)) ws.emit("update", room.toJSON("activities"))
+    // WebRTC signaling
+    // client1 --ask--> client2
+    // client2 --offer--> client1
+    // client1 --answer--> client2
+    // client2 --candidate--> client1
+    // client1 --candidate--> client2
+    // end
+    const rtc_channel = "__rtc__" + roomId
+    ws.on("rtc_join", () => {
+        ws.subscribe(rtc_channel)
+        room.join_rtc(id, user)
+        ws.to(rtc_channel, "rtc_ask", id)
+        console.log(`user ${user} joined rtc room ${roomId}`)
+        ws.reply(
+            "rtc_ok",
+            Object.keys(room.rtcSessions).filter((v) => v !== id)
+        )
     })
-
-    // WebRTC
-    ws.on("join_rtc", () => {
-        room.addUid("<rtcjoin>", user)
-        ws.broadcast("join_rtc", { user })
-        ws.emit("update", room.toJSON("msgs"))
+    ws.on("rtc_leave", () => {
+        room.leave_rtc(id)
+        ws.to(rtc_channel, "rtc_leave", id)
+        ws.unsubscribe(rtc_channel)
     })
-    ws.on("leave_rtc", () => {
-        room.addUid("<rtcleave>", user)
-        ws.broadcast("leave_rtc", { user })
-        ws.emit("update", room.toJSON("msgs"))
-    })
-    ws.on("offer", (sdp) => ws.broadcast("offer", { user, sdp }))
-    ws.on("answer", (sdp) => ws.broadcast("answer", { user, sdp }))
-    ws.on("candidate", (candidate) => ws.broadcast("candidate", { user, candidate }))
 
     console.log(`user ${user} joined room ${roomId}`)
     ws.reply("sync", Date.now() + 300)
     ws.broadcast("update", room.toJSON("clientCount", "onlineUsers", "msgs"))
     ws.reply("update", room.toJSON())
-})
-
-watch("./public", { recursive: true }, (rev, filename) => {
-    console.log("🦊 File changed:", filename)
-    console.log("🦊 Reloading static files...")
-    io.emit("reload")
 })
 
 const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
@@ -158,11 +160,19 @@ const roomRouter = <T extends Elysia<any, any, any>>(app: T) =>
             const r = Room.getRoom(room)!
             const res = r.addRichUid(body)
             res.length && io.to(room)?.emit("update", r.toJSON(...res))
-            return "ok" //r.toJSON("current")
+            return "ok"
         })
 
 roomRouter(app) // mount to /
 app.group("/r/:room", roomRouter) // mount to /r/:room
+
+if (bun.env._BUN_WATCHER_CHILD) {
+    console.log("🔥 --watch detected, HMR enabled")
+    hot(io)
+    // setTimeout(() => {
+    //     io.emit("reload")
+    // }, 1e3)
+}
 
 app.listen(8887)
 console.log(`🦊 Elysia is running at http://${app.server?.hostname}:${app.server?.port}`)

@@ -52,6 +52,12 @@ export interface IRoomActivity {
     time: number
 }
 
+export interface IRtcSession {
+    id: string
+    user: string
+    time: number
+}
+
 export const modes = ["normal", "melt"] as const
 type Mode = (typeof modes)[number]
 
@@ -81,6 +87,7 @@ export class Room extends EventEmitter implements IRoom {
     msgs: IMessage[] = []
     onlineUsers: { [key: string]: IRoomOnlineUser } = {}
     activities: IRoomActivity[] = []
+    rtcSessions: { [key: string]: IRtcSession } = {}
     constructor(id = "default") {
         super()
         if (!fs.existsSync("rooms")) fs.mkdirSync("rooms", { recursive: true })
@@ -143,26 +150,30 @@ export class Room extends EventEmitter implements IRoom {
         this.save()
     }
 
+    addMsg(text: string, user = "[system]") {
+        const msg = {
+            id: nanoid(10),
+            user: user,
+            text: text.slice(0, 40),
+            time: Math.floor(Date.now() / 1000),
+        }
+        this.msgs = [...this.msgs.slice(1 - 40), msg]
+        this.save()
+        this.emit("msg", msg)
+    }
+
     addUid<T extends keyof IRoom>(uid: string, user = "[bot]"): T[] {
         if (typeof uid !== "string") uid = String(uid)
         if (!/^\d{9}\.?$/.test(uid)) {
-            const msg = {
-                id: nanoid(10),
-                user: user,
-                text: uid.slice(0, 40),
-                time: Math.floor(Date.now() / 1000),
-            }
-            this.msgs = [...this.msgs.slice(-19), msg]
-            this.save()
-            this.emit("msg", msg)
-            return ["msgs"] as T[]
+            this.addMsg(uid, user)
+            return []
         }
 
         const index = this.pending.findIndex((item) => item.uid === uid)
         if (index !== -1) {
-            const item = this.pending[index]
+            const item = { ...this.pending[index], status: "success" as const }
             this.pending.splice(index, 1)
-            this.current.push({ ...item, status: "success" })
+            this.current.push(item)
             this.count++
             this.save()
             this.emit("add_uid", item)
@@ -416,19 +427,40 @@ export class Room extends EventEmitter implements IRoom {
             const obj: ReturnType<typeof Room.prototype.toJSONServer> = JSON.parse(json)
 
             this.maxClient = obj.maxClient || 50
+            this.mode = obj.mode || "normal"
             this.current = obj.current || []
             this.history = obj.history || []
             this.pending = obj.pending || []
             this.count = obj.count || 0
             this.msgs = obj.msgs || []
             this.activities = obj.activities || []
-            this.mode = obj.mode || "normal"
         } catch (e) {
             console.error(`读取房间数据失败：${this.id}`)
         }
     }
 
-    on(event: "join" | "leave" | "add_uid" | "new_act" | "join_act" | "del_act" | "mode_change" | "max_client_change", listener: (...args: any[]) => void) {
+    join_rtc(id: string, user: string) {
+        let session = { id, user, time: Math.floor(Date.now() / 1000) }
+        this.rtcSessions[id] = session
+        this.addMsg("<rtcjoin>", user)
+        this.save()
+        this.emit("rtc_joined", session)
+        return session
+    }
+
+    leave_rtc(id: string) {
+        let session = this.rtcSessions[id]
+        if (!session) return
+        this.addMsg("<rtcleave>", session.user)
+        delete this.rtcSessions[id]
+        this.save()
+        this.emit("rtc_leaved", session)
+    }
+
+    on(
+        event: "join" | "leave" | "msg" | "add_uid" | "new_act" | "join_act" | "del_act" | "mode_change" | "max_client_change" | "rtc_joined" | "rtc_leaved",
+        listener: (...args: any[]) => void
+    ) {
         return super.on(event, listener)
     }
 }

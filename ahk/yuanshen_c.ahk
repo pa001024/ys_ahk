@@ -477,10 +477,12 @@ _tp_boss_bottom() {
     }
     Click 247, 455 ; 讨伐
     Sleep 1
-    Click 474, 171 ; 全部
-    Sleep 1
-    Click 466, 357 ; 首领
-    Sleep 1
+    loop 2 {
+        Click 474, 171 ; 全部
+        Sleep 1
+        Click 466, 357 ; 首领
+        Sleep 1
+    }
     while not CheckColor(798, 687, "FFFFFF") {
         Click 797, 701 ; 滚动条
         Sleep 16
@@ -496,12 +498,15 @@ _tp_trace() {
         Sleep 1
         Click 1212, 700 ; 追踪
     }
-    Sleep 150
+    Sleep 220
 }
 
 _tp_f1(x1, y1, x2, y2) {
     _tp_boss_bottom()
-    Click x1, y1 ; 冰风
+    loop 3 {
+        Click x1, y1 ; 冰风
+        Sleep 10
+    }
     _tp_trace()
     loop 5 {
         Click x2, y2 ; 锚点

@@ -5,9 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>自助餐</title>
         <link rel="icon" href="/app.ico" />
-        <link rel="stylesheet" href="/css/index.css" async />
-        <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
-        <script src="/js/index.js" async></script>
+        <link rel="stylesheet" href="/css/index.css?v=20240531" async />
+        <script src="/js/vue.global.min.js"></script>
+        <script src="/js/index.js?v=1717250561045" async></script>
     </head>
 
     <body>
@@ -137,11 +137,11 @@
                     </ul>
                 </div>
                 <form @submit.prevent="submitInput" class="flex-box msg-form">
-                    <button class="ys-btn icon-btn" :class="{ checked: isMicOn }" @click="toggleMic">
+                    <div class="ys-btn icon-btn" :class="{ checked: isMicOn }" @click="toggleMic">
                         <svg class="icon icon-mic">
                             <use xlink:href="#icon-mic" />
                         </svg>
-                    </button>
+                    </div>
                     <div class="ys-autocomplete flex-1">
                         <ul v-show="newUid.startsWith('/')">
                             <li @click="setCmd('/c 1')">/c[ount] &lt;当前计数&gt; - 自动计数</li>

@@ -107,7 +107,7 @@ CapsLock & 4:: {
   t := YSCounter.counter_last_update_time
   ; YSCounter.Add(2)
   YSCounter.Add(4)
-  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(A_TickCount - t)))
+  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(getTimeStamp() - t)))
 }
 
 ; 私车路2
@@ -116,7 +116,7 @@ F4:: {
   _auto_exit()
   t := YSCounter.counter_last_update_time
   YSCounter.Add(2)
-  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(A_TickCount - t)))
+  API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(getTimeStamp() - t)))
 }
 
 ; 计数器

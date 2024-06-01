@@ -17,6 +17,10 @@ class API {
         url := this.baseUrl . 'list'
         return StrSplit(httpRequest(url), ",")
     }
+    static PullUID(uid) {
+        url := this.baseUrl . 'pull'
+        return httpRequest(url)
+    }
     static AddUID(uid) {
         url := Format(this.baseUrl . 'add/{1:s}?cooker=🦈', uid)
         return StrSplit(httpRequest(url), ",")

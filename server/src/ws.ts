@@ -15,6 +15,7 @@ export class WsServer {
             .ws("/ws", {
                 open: (ws) => {
                     const { roomId, user } = ws.data
+                    ws.id
                     if (!roomId || !user) return
                     ws.subscribe(roomId)
                     ws.send({ event: "joined", data: ws.id })
@@ -37,7 +38,9 @@ export class WsServer {
                     }
                 },
                 message: (ws, message: any) => {
-                    if (message.event) {
+                    if (message.to) {
+                        this.id(message.to)?.send(ws.id, message.event, message.data)
+                    } else if (message.event) {
                         this.emitter.emit(message.event, message.data)
                         this.wsMap.get(ws.id)?.emitter.emit(message.event, message.data)
                     }
@@ -56,19 +59,24 @@ export class WsServer {
     to(roomId = "default") {
         return this.roomMap.get(roomId)!.at(0)
     }
+    id(id: string) {
+        return this.wsMap.get(id)
+    }
 }
 
 export class WsConnection {
+    id: string
+    roomId: string
+    user: string
     emitter = new EventEmitter()
-    constructor(private ws: Omit<ServerWebSocket, "data"> & { data: { roomId: string; user: string } }) {
+    constructor(private ws: Omit<ServerWebSocket, "data"> & { id: string; data: { roomId: string; user: string } }) {
+        this.id = ws.id
         this.roomId = ws.data.roomId
         this.user = ws.data.user
     }
     on(event: string, listener: (...args: any[]) => void) {
         this.emitter.on(event, listener)
     }
-    roomId = ""
-    user = ""
     broadcast(event: string, data: any) {
         this.ws.publish(this.roomId, JSON.stringify({ event, data }))
     }
@@ -78,5 +86,17 @@ export class WsConnection {
     }
     reply(event: string, data: any) {
         this.ws.send(JSON.stringify({ event, data }))
+    }
+    send(from: string, event: string, data: any) {
+        this.ws.send(JSON.stringify({ from, event, data }))
+    }
+    to(topic: string, event: string, data: any) {
+        this.ws.publish(topic, JSON.stringify({ event, data }))
+    }
+    subscribe(topic: string) {
+        this.ws.subscribe(topic)
+    }
+    unsubscribe(topic: string) {
+        this.ws.unsubscribe(topic)
     }
 }
