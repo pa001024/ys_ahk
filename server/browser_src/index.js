@@ -30,6 +30,7 @@ let loadJS = (function () {
 function io(roomId, playerName) {
     class ioClient {
         constructor(roomId, playerName) {
+            this.heartbeat = null
             this.reconnect(roomId, playerName)
         }
         reconnect(roomId, playerName) {
@@ -45,6 +46,7 @@ function io(roomId, playerName) {
             }
             this.ws.onclose = () => {
                 console.info("[io] disconnected")
+                clearInterval(this.heartbeat)
                 setTimeout(() => {
                     this.reconnect(roomId, playerName)
                 }, 1)
@@ -52,6 +54,9 @@ function io(roomId, playerName) {
             this.on("joined", (id) => {
                 this.id = id
                 console.info("[io] connected:", id)
+                this.heartbeat = setInterval(() => {
+                    this.emit("ping")
+                }, 30e3)
             })
             this.events.pop()
             this.events.forEach(({ event, handler }) => {
@@ -116,7 +121,7 @@ function io(roomId, playerName) {
             })
         }
     }
-    return (window.ioc = new ioClient(roomId, playerName))
+    return new ioClient(roomId, playerName)
 }
 
 async function voicechat(socket, denoise) {
