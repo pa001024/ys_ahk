@@ -116,7 +116,7 @@ pub fn capture_rect_vec(rect: (i32, i32, i32, i32)) -> Vec<u8> {
     };
     raw
 }
-pub fn capture_rect(rect: (i32, i32, i32, i32)) -> ImageBuffer<image::Rgb<u8>, Vec<u8>> {
+pub fn capture_rect(rect: (i32, i32, i32, i32)) -> RgbImage {
     let (x1, y1, x2, y2) = rect;
     let w = (x2 - x1) as u32;
     let h = (y2 - y1) as u32;

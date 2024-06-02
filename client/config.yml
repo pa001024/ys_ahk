@@ -1,11 +1,11 @@
-cooker: 小🦈
+cooker: 香菱
 endpoint: https://xn--chq26veyq.icu/r/default/
 token: token
 reply:
   timeout: 30
   reply_timeout: 50.0
   rules:
-  - pattern: 拒绝|机器人|别打|不[好可行能要]|^不打?$|no|shg|珊瑚宫|留着|[4四]连|-6|刚打过了|看下?签名
+  - pattern: ^(?:我(?:能|可以))?拒绝|机器人|别打|不[好可行能要]|^不打?$|no|shg|珊瑚宫|留着|[4四]连|-6|刚打过了|看下?签名
     reactions:
     - !Msg 打扰了！
     case: Failure

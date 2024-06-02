@@ -70,7 +70,7 @@ impl Config {
     pub fn default() -> Self {
         Self {
             cooker: "香菱".to_string(),
-            endpoint: "http://47.94.95.163:8887/r/default/".to_string(),
+            endpoint: "https://xn--chq26veyq.icu/r/default/".to_string(),
             token: "token".to_string(),
             actions: ActionsConfig {
                 on_enter: vec![
@@ -88,7 +88,7 @@ impl Config {
                 reply_timeout: 50.0,
                 rules: vec![
                     ReplyRule {
-                        pattern: "^拒绝|别打|不[好可行能要]|^不打?$|no|shg|珊瑚宫|留着|[4四]连|-6|刚打过了|看下?签名".to_string(),
+                        pattern: "^(?:我(?:能|可以))?拒绝|机器人|不[好可行能要]|^不打?$|no|shg|珊瑚宫|留着|[4四]连|-6|刚打过了|看下?签名".to_string(),
                         reactions: vec![
                             Action::Msg("打扰了！".to_string())
                         ],

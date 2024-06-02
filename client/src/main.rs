@@ -2,10 +2,10 @@ mod config;
 mod cooker;
 mod game;
 mod ocr;
+mod ppocr;
 mod util;
 use crate::config::Config;
 use crate::cooker::Cooker;
-use crate::ocr::*;
 use crate::util::*;
 use console::style;
 #[macro_use]

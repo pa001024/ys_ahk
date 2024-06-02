@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::{config::*, game::*, util::*, DDDDOcr};
+use crate::{config::*, game::*, ocr::OCR, util::*};
 use console::{style, Term};
 use image::DynamicImage;
 use indicatif::{MultiProgress, ProgressBar};
@@ -12,7 +12,7 @@ pub struct Cooker<'a> {
     pub cfg: Config,
     pub ctl: GameControl,
     pub okimg: image::ImageBuffer<image::Luma<f32>, Vec<f32>>,
-    pub ocr: DDDDOcr,
+    pub ocr: OCR,
     pub state: GameState,
     pub step: Step,
     pub bars: MultiProgress,
@@ -71,7 +71,7 @@ impl<'a> Cooker<'a> {
                     .to_luma32f();
                 img
             },
-            ocr: DDDDOcr::new(),
+            ocr: OCR::new(),
             state: GameState::Unknown,
             step: Step::AutoReply,
             bars: MultiProgress::new(),
@@ -534,8 +534,12 @@ impl<'a> Cooker<'a> {
     pub fn RecognizeText(&self, rect: (i32, i32, i32, i32)) -> String {
         let rect = self.ctl.toScreenRect(rect);
         let img = capture_rect(rect);
-        let img_data = img_to_bytes(&img);
-        self.ocr.identify(img_data.as_slice())
+        let dimg = DynamicImage::ImageRgb8(img);
+        if let Ok(text) = self.ocr.rec(&dimg) {
+            return text;
+        } else {
+            return "".to_string();
+        }
     }
 
     pub fn SaveBase64Img(&mut self, rect: (i32, i32, i32, i32)) {
