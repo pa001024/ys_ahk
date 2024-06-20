@@ -75,6 +75,8 @@ class YSCounter {
     }
 }
 
+YSCounter.Load()
+
 format_time_diff(t) {
     milliseconds := mod(t, 1000)
     seconds := mod(t / 1000, 60)

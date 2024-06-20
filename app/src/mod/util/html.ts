@@ -1,0 +1,33 @@
+// 定义允许的标签
+const allowedTags = new Set(["span", "b", "i", "s", "u", "em", "a", "img"])
+
+// 定义允许的属性
+const allowedAttributes = new Set(["href", "src"])
+
+export const sanitizeHTML = (inputHTML: string) => {
+    // 创建一个新的 DOMParser 实例
+    const parser = new DOMParser()
+    // 解析输入的 HTML 字符串
+    const doc = parser.parseFromString(inputHTML, "text/html")
+
+    // 遍历文档中的所有元素
+    const elements = doc.body.querySelectorAll("*")
+    for (let i = 0; i < elements.length; i++) {
+        const el = elements[i]
+        const tagName = el.tagName.toLowerCase()
+
+        // 如果元素的标签不在允许的标签集合中，则移除该元素
+        if (!allowedTags.has(tagName)) {
+            el.parentNode?.removeChild(el)
+        } else {
+            // 如果元素在允许的标签集合中，移除所有不在允许列表中的属性
+            Array.from(el.attributes).forEach((attr) => {
+                if (!allowedAttributes.has(attr.name.toLowerCase())) {
+                    el.removeAttribute(attr.name)
+                }
+            })
+        }
+    }
+
+    return doc.body.innerHTML
+}

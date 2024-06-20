@@ -304,23 +304,44 @@ _copy_uid(flag := false) {
     return uid
 }
 _login() {
-    SendEvent "+{End}^c"
-    WinActivate "原神"
+    now := A_TickCount
+    while not WinActive("原神") {
+        WinActivate "原神"
+        Sleep 100
+        if A_TickCount - now > 30e3
+            return false
+    }
+    WaitColor(637, 213, "FFFFFF", 20e3)
     array := StrSplit(A_Clipboard, "----")
+    has_uid := RegExMatch(array[1], "^\d{9}$")
+    index := 1 + (has_uid ? 1 : 0)
     Click 977, 348
-    A_Clipboard := array[1]
+    Sleep 20
+    A_Clipboard := array[index]
     SendEvent "^v"
+    Sleep 20
     Click 991, 420
-    A_Clipboard := array[2]
+    A_Clipboard := array[index + 1]
     SendEvent "^v"
-    if not CheckColor(582, 512, "DEBC60") {
+    while not CheckColor(582, 512, "DEBC60") {
         Sleep 20
-        Click 578, 509
+        Click 582, 512
     }
     Sleep 40
-    Click 797, 578
+    Click 797, 578 ; 登录
 }
 
+last_uid := ""
+_auto_enter_uniq() {
+    global last_uid
+    if A_Clipboard == last_uid {
+        return true
+    }
+    last_uid := A_Clipboard
+    if RegExMatch(A_Clipboard, "^\d{9}$") {
+        _auto_enter()
+    }
+}
 
 _auto_enter() {
     WinActivate "原神"
@@ -336,7 +357,7 @@ _auto_enter() {
     Click 1242 * w / 1600, 103 * h / 900 ; 粘贴
     Sleep 60
     Click 1403 * w / 1600, 101 * h / 900 ; 搜索
-    Sleep 100
+    Sleep 200
 
     if not CheckColor(257 * w / 1600, 295 * h / 900, "D.D.C.") {
         Click 1355 * w / 1600, 199 * h / 900
@@ -511,7 +532,7 @@ _tp_f1(x1, y1, x2, y2) {
     loop 5 {
         Click x2, y2 ; 锚点
         Sleep 1
-        Click 1233, 839 ; 传送
+        Click 1299, 817 ; 传送
         Sleep 99
     }
 }

@@ -1,21 +1,82 @@
-mod config;
-mod cooker;
-mod game;
-mod ocr;
-mod ppocr;
-mod util;
-use crate::config::Config;
-use crate::cooker::Cooker;
-use crate::util::*;
-use console::style;
-#[macro_use]
-extern crate lazy_static;
+extern crate lib;
+use console::{style, Term};
+use indicatif::{MultiProgress, ProgressBar};
+use lib::config::Config;
+use lib::cooker::{CookDisplay, Cooker};
+use lib::util::*;
+use std::time::Duration;
 
-// cargo run --target i686-pc-windows-msvc
+struct ConsoleDisplay {
+    pub bars: MultiProgress,
+    state_bar: ProgressBar,
+    step_bar: ProgressBar,
+    full_bar: ProgressBar,
+}
+
+impl ConsoleDisplay {
+    fn new() -> Self {
+        let bars = MultiProgress::new();
+        let state_bar = bars.add(ProgressBar::new_spinner());
+        let step_bar = bars.add(ProgressBar::new_spinner());
+        let full_bar = bars.add(ProgressBar::new_spinner());
+        Self {
+            bars,
+            state_bar,
+            step_bar,
+            full_bar,
+        }
+    }
+}
+
+impl CookDisplay for ConsoleDisplay {
+    fn on_state_change(&self, state: lib::cooker::GameState) {
+        self.state_bar
+            .set_message(format!("{}: {:?}", style("State:").blue(), state));
+    }
+
+    fn on_step_change(&self, step: lib::cooker::Step) {
+        self.step_bar
+            .set_message(format!("{}: {:?}", style("Step:").blue(), step));
+    }
+
+    fn on_pool_full_change(&self, is_full: bool) {
+        if is_full {
+            self.bars.add(self.full_bar.clone());
+            self.full_bar.enable_steady_tick(Duration::from_millis(200));
+            self.full_bar
+                .set_message(format!("{}", style("UID池已满 等待中...").red()));
+        } else {
+            self.bars.remove(&self.full_bar);
+        }
+    }
+
+    fn log(&self, msg: String) {
+        use chrono::{Local, NaiveTime};
+        let now = Local::now();
+        let time = NaiveTime::from(now.time());
+        let timestamp = style(time.format("[%H:%M:%S]").to_string()).cyan();
+        let _ = self.bars.println(format!("{timestamp} {msg}"));
+    }
+
+    fn on_start(&self) {
+        self.state_bar
+            .enable_steady_tick(Duration::from_millis(200));
+        self.step_bar.enable_steady_tick(Duration::from_millis(200));
+    }
+
+    fn on_success(&self, _data: lib::cooker::CookData) {
+        // self.log()
+    }
+
+    fn on_exit(&self) {
+        self.state_bar.finish();
+        self.step_bar.finish();
+    }
+}
+
 fn main() -> Result<(), std::io::Error> {
-    let console = console::Term::stdout();
-    // console.clear_screen()?;
-    console.set_title("做饭姬");
+    let console = Term::stdout();
+    console.set_title(format!("做饭姬 v{}", env!("CARGO_PKG_VERSION")));
     println!(
         "{} ver: {}",
         style("做饭姬").green().bold(),
@@ -28,8 +89,9 @@ fn main() -> Result<(), std::io::Error> {
     // 获取游戏窗口句柄
     let hwnd = find_window(None, Some("原神"));
     if let Some(hwnd) = hwnd {
+        let mon = ConsoleDisplay::new();
         // 实例化游戏控制对象
-        let mut cooker = Cooker::new(&console, cfg, hwnd);
+        let mut cooker = Cooker::new(mon, cfg, hwnd);
         cooker.run();
         println!("{} 自动退出", style("切换窗口").red());
         Ok(())

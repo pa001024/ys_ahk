@@ -58,7 +58,7 @@ SendText2(text) {
   bak := ClipboardAll()
   A_Clipboard := text
   SendEvent "^v"
-  Sleep 100
+  Sleep 200
   A_Clipboard := bak
 }
 

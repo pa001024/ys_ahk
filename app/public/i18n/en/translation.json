@@ -1,0 +1,14 @@
+{
+    "main": {
+        "btn_pin_window": "Pin window on top",
+        "btn_unpin_window": "Unpin window",
+        "btn_collapse_menu": "Collapse menu"
+    },
+    "settings": {
+        "title": "Settings"
+    },
+    "setting": {
+        "title": "",
+        "appearance": "Appearance Settings"
+    }
+}

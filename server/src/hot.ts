@@ -1,12 +1,12 @@
-import * as bun from "bun"
 import { watch, readFileSync, writeFileSync } from "fs"
 import { filter, fromEventPattern, map, throttleTime } from "rxjs"
-import type { WsServer } from "./ws"
+import type { WsServer } from "./rt/ws"
+import { build } from "./build"
 
 export function hot(io: WsServer) {
     // dev hot loader
     fromEventPattern(
-        (handler) => watch("./public", { recursive: true }, handler),
+        (handler) => watch("./dist", { recursive: true }, handler),
         void 0,
         (ev: string, filename: string) => ({ ev, filename })
     )
@@ -24,7 +24,7 @@ export function hot(io: WsServer) {
                 console.log(`🔥 HMR reload css: ${path}`)
                 io.emit("reload_css", path)
             } else if (path.endsWith(".js")) {
-                const html_file = "./public/index.html"
+                const html_file = "./dist/index.html"
                 const html = readFileSync(html_file, "utf-8")
                 const reg = new RegExp(`/${path.replace(".", "\\.")}\\?v=(\\d+)`)
                 const match = html.match(reg)
@@ -44,15 +44,12 @@ export function hot(io: WsServer) {
         (ev: string, filename: string) => ({ ev, filename })
     )
         .pipe(
-            filter(({ ev, filename }) => ev === "change" && (filename.endsWith(".ts") || filename.endsWith(".js"))),
+            filter(({ ev, filename }) => ev === "change"),
             map(({ filename }) => filename.replace(/\\/g, "/")),
-            throttleTime(10)
+            throttleTime(1e3)
         )
         .subscribe((path) => {
             console.log("🦊 Building", path)
-            bun.build({
-                entrypoints: [`./browser_src/${path}`],
-                outdir: "./public/js",
-            })
+            build(false)
         })
 }

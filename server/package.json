@@ -5,20 +5,39 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts",
     "sv": "bun run src/index.ts",
-    "bu": "bun build browser_src/*.* --outdir public/js/ --minify"
+    "bu": "bun run src/build.ts",
+    "gen": "drizzle-kit generate --schema ./src/db/schema.ts --dialect sqlite",
+    "migrate": "bun run src/db/migrate.ts"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.0.2",
+    "@elysiajs/graphql-yoga": "^1.0.3",
     "@elysiajs/static": "^1.0.3",
     "@elysiajs/stream": "^1.0.2",
+    "@graphql-yoga/plugin-sofa": "^3.4.0",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/apollo-composable": "^4.0.2",
+    "bcrypt": "^5.1.1",
+    "drizzle-graphql": "^0.8.3",
+    "drizzle-orm": "^0.31.2",
     "elysia": "latest",
+    "graphql": "^16.8.2",
+    "graphql-mobius": "^0.1.13",
+    "graphql-tag": "^2.12.6",
+    "graphql-ws": "^5.16.0",
+    "graphql-yoga": "^5.3.1",
+    "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.0.7",
-    "rxjs": "^7.8.1"
+    "node-machine-id": "^1.1.12",
+    "rxjs": "^7.8.1",
+    "vite": "^5.2.12",
+    "vue": "3"
   },
   "devDependencies": {
-    "@shiguredo/rnnoise-wasm": "^2022.2.0",
-    "@types/emscripten": "^1.39.13",
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.6",
     "bun-types": "latest",
-    "wasm-feature-detect": "^1.6.1"
+    "drizzle-kit": "^0.22.7"
   },
   "module": "src/index.js"
 }
