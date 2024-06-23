@@ -1,6 +1,9 @@
 #Requires AutoHotkey v2.0
 #Include lib.ahk
 
+; 按键映射
+Insert::=
+
 CapsLock & r:: Reload()
 ; 鼠标连点
 CapsLock & x:: {

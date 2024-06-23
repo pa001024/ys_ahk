@@ -1,6 +1,6 @@
 import { useLocalStorage } from "@vueuse/core"
 import { defineStore } from "pinia"
-import { gqClientHttp, gql } from "../http/graphql"
+import { gqClient, gql } from "../http/graphql"
 
 export const useSettingStore = defineStore("setting", {
     state: () => {
@@ -27,7 +27,7 @@ export const useSettingStore = defineStore("setting", {
             this.name = nickname
         },
         async login(email: string, password: string) {
-            const result = await gqClientHttp
+            const result = await gqClient
                 .mutation(
                     gql`
                         mutation login($email: String!, $password: String!) {

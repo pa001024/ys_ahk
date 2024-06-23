@@ -1,6 +1,5 @@
 // for `bun gen`
 
-import { sql } from "drizzle-orm"
 import { sqliteTable, text, integer, foreignKey, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { nanoid } from "nanoid"
 import { relations } from "drizzle-orm"
@@ -27,6 +26,10 @@ export const users = sqliteTable(
         emailIdx: uniqueIndex("email_idx").on(users.email),
     })
 )
+
+export const userRelations = relations(users, ({ one }) => ({
+    password: one(passwords, { fields: [users.id], references: [passwords.user_id] }),
+}))
 
 /** 登录 */
 export const logins = sqliteTable(
@@ -66,10 +69,6 @@ export const passwords = sqliteTable(
     })
 )
 
-export const passwordRelations = relations(passwords, ({ one }) => ({
-    user: one(users, { fields: [passwords.user_id], references: [users.id] }),
-}))
-
 /** 房间 */
 export const rooms = sqliteTable(
     "rooms",
@@ -89,8 +88,9 @@ export const rooms = sqliteTable(
     })
 )
 
-export const roomsRelations = relations(rooms, ({ one }) => ({
+export const roomsRelations = relations(rooms, ({ one, many }) => ({
     owner: one(users, { fields: [rooms.owner_id], references: [users.id] }),
+    msgs: many(msgs, { relationName: "room" }),
 }))
 
 export const msgs = sqliteTable(
@@ -112,7 +112,7 @@ export const msgs = sqliteTable(
     })
 )
 
-export const msgsRelations = relations(msgs, ({ one }) => ({
-    room: one(rooms, { fields: [msgs.room_id], references: [rooms.id] }),
-    user: one(users, { fields: [msgs.user_id], references: [users.id] }),
+export const msgsRelations = relations(msgs, ({ one, many }) => ({
+    room: one(rooms, { fields: [msgs.room_id], references: [rooms.id], relationName: "room" }),
+    user: one(users, { fields: [msgs.user_id], references: [users.id], relationName: "user" }),
 }))

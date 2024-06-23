@@ -62,7 +62,7 @@ class RoomManager extends EventEmitter<ClientEvent> {
     }
     ws: WSClient
 
-    ready!: PromiseLike<void>
+    ready: PromiseLike<void>
     constructor(url: string) {
         super()
         this.ws = new WSClient<ServerMessage>(url, {
@@ -94,12 +94,13 @@ class RoomManager extends EventEmitter<ClientEvent> {
                 console.log("room syn", id)
                 this.id = id
                 this.timeOffset = t - Date.now()
+                // 重新连接时触发
+                this.ws.on("open", syn)
             })
+            return this.ready
         }
 
-        // 重新连接时触发
-        this.ws.on("open", syn)
-        syn()
+        this.ready = syn()
     }
 
     /** __core:__ send message to server */

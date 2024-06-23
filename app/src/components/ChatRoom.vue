@@ -1,90 +1,134 @@
 <script lang="ts" setup>
 import { useTimestamp } from "@vueuse/core"
 import { useInfiniteScroll, useScroll } from "@vueuse/core"
-import { FunctionDirective, computed, nextTick, ref, watchEffect } from "vue"
-import { useRoom, useRoomManager } from "../mod/http/room"
-import { sanitizeHTML } from "../mod/util/html"
-import { gql, useQuery } from "@urql/vue"
+import { FunctionDirective, computed, nextTick, onMounted, ref, watch } from "vue"
+import { isImage, sanitizeHTML } from "../mod/util/html"
+import { gql, useMutation, useQuery, useSubscription } from "@urql/vue"
+import { gqClient } from "../mod/http/graphql"
 
 const props = defineProps<{ roomId: string }>()
+const roomId = computed(() => props.roomId)
 
 const el = ref<HTMLElement | null>(null)
 
-const { arrivedState } = useScroll(el, { offset: { left: 0, top: 20, right: 0, bottom: 20 } })
+const { arrivedState } = useScroll(el, { offset: { left: 0, top: 20, right: 0, bottom: 200 } })
 
-const { data } = useQuery<{ msgs: { id: string; content: string; createdAt: string; user: { id: string; name: string; qq: number } }[] }>({
-    query: /* GraphQL */ gql`
-        query ($eq: String!) {
-            msgs(where: { room_id: { eq: $eq } }) {
-                id
-                content
-                createdAt
-                user {
-                    id
-                    name
-                    qq
-                }
-            }
-        }
-    `,
-    variables: { eq: props.roomId },
-})
-
-watchEffect(() => {
-    if (data.value) {
-        data.value.msgs.forEach((msg) => {
-            const { id, content, createdAt, user } = msg
-            const { name, qq } = user
-            const time = new Date(createdAt).getTime()
-            addMessage({ id, name, qq, content, time })
-        })
-    }
-})
-// mock data
-// setInterval(() => {
-//     addMessage({
-//         id: Math.random().toString(36).substring(2, 15),
-//         name: "pa",
-//         qq: 756458112,
-//         content: Math.random().toString(36).substring(2, 15),
-//         time: 1718269479,
-//     })
-// }, 1000)
-
-const rm = useRoomManager()
-const room = await useRoom(props.roomId)
-const time = useTimestamp({ interval: 1000, offset: rm?.timeOffset })
-const nowSeconds = computed(() => ~~(time.value / 1000))
-interface Msg {
+type Msg = {
     id: string
-    name: string
-    qq: number
     content: string
-    time: number
+    createdAt: string
+    user: { id: string; name: string; qq: number }
 }
+
+const reachedTop = ref(false)
+const loadingTop = ref(false)
 const messages = ref<Msg[]>([])
 
-function getMsg(n: number) {
-    return Array(n)
-        .fill(0)
-        .map((_, i) => ({
-            id: Math.random().toString(36).substring(2, 15),
-            name: "pa",
-            qq: 756458112,
-            content: Math.random().toString(36).substring(2, 15),
-            time: 1718269479,
-        }))
+async function getMsgs() {
+    const { data } = await gqClient
+        .query<{ msgs: Msg[] }>(
+            gql`
+                query ($room_id: String!, $limit: Int, $offset: Int) {
+                    msgs(room_id: $room_id, limit: $limit, offset: $offset) {
+                        id
+                        content
+                        createdAt
+                        room_id
+                        user {
+                            id
+                            name
+                            qq
+                        }
+                    }
+                }
+            `,
+            { room_id: props.roomId, limit: 10, offset: messages.value.length },
+            { requestPolicy: "cache-and-network" }
+        )
+        .toPromise()
+    return data?.msgs
 }
+
+async function loadHistory() {
+    messages.value = []
+    const msgs = await getMsgs()
+    if (msgs) {
+        reachedTop.value = false
+        messages.value = msgs
+
+        nextTick(() => {
+            el.value?.scrollTo({
+                top: el.value.scrollHeight,
+                left: 0,
+                // behavior: "smooth",
+            })
+        })
+    }
+}
+
+onMounted(loadHistory)
+
+watch(() => props.roomId, loadHistory)
+
+useSubscription<{ newMessage: Msg }, Msg[]>(
+    {
+        query: gql`
+            subscription ($room_id: String!) {
+                newMessage(room_id: $room_id) {
+                    id
+                    edited
+                    content
+                    user {
+                        id
+                        name
+                        qq
+                    }
+                }
+            }
+        `,
+        variables: { room_id: roomId },
+    },
+    (_, data) => {
+        addMessage(data.newMessage)
+        return []
+    }
+)
+
+const { executeMutation: sendMessageMut } = useMutation(gql`
+    mutation ($content: String!, $room_id: String!) {
+        sendMessage(content: $content, room_id: $room_id) {
+            success
+            message
+            msg {
+                id
+                createdAt
+            }
+        }
+    }
+`)
+
+const time = useTimestamp({ interval: 1000, offset: 0 })
+const nowSeconds = computed(() => ~~(time.value / 1000))
 
 useInfiniteScroll(
     el,
     () => {
-        if (arrivedState.top && arrivedState.bottom) return
-        // load more
-        const oriH = el.value!.scrollHeight
-        messages.value.unshift(...getMsg(5))
-        nextTick(() => {
-            el.value!.scrollTop = el.value!.scrollHeight - oriH
+        nextTick(async () => {
+            if (messages.value.length < 10 || (arrivedState.top && arrivedState.bottom)) return
+            // load more
+            const oriH = el.value!.scrollHeight
+            if (reachedTop.value) return
+            loadingTop.value = true
+            const msgs = await getMsgs()
+            loadingTop.value = false
+            if (!msgs || msgs.length === 0) {
+                reachedTop.value = true
+                return
+            }
+            messages.value.unshift(...msgs)
+            nextTick(() => {
+                el.value!.scrollTop = el.value!.scrollHeight - oriH
+            })
         })
     },
     { distance: 20, direction: "top" }
@@ -109,7 +153,7 @@ function addMessage(msg: Msg) {
 const input = ref<HTMLDivElement | null>(null)
 const inputForm = ref<HTMLDivElement | null>(null)
 
-function sendMessage(e: Event) {
+async function sendMessage(e: Event) {
     if ((e as KeyboardEvent)?.shiftKey) {
         return
     }
@@ -117,18 +161,11 @@ function sendMessage(e: Event) {
     const html = input.value?.innerHTML
     if (!html) return
     const content = sanitizeHTML(html)
-    console.log(content)
-    const msg: Msg = {
-        id: Math.random().toString(36).substring(2, 15),
-        name: "pa",
-        qq: 756458112,
-        content,
-        time: nowSeconds.value,
+    const { data } = await sendMessageMut({ content, room_id: props.roomId })
+    if (data?.sendMessage.success) {
+        input.value!.innerHTML = ""
+        input.value!.focus()
     }
-    addMessage(msg)
-    room?.send(content)
-    input.value!.innerHTML = ""
-    input.value!.focus()
 }
 
 const imgLoading = ref(false)
@@ -202,42 +239,51 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
         <div class="flex-1 flex flex-col overflow-hidden">
             <ScrollArea class="flex-1 overflow-hidden" @loadref="(r) => (el = r)">
                 <div class="flex w-full h-full flex-col gap-2 p-4">
+                    <div v-if="loadingTop" class="flex justify-center items-center">
+                        <span class="loading loading-spinner loading-md"></span>
+                    </div>
+                    <div class="flex justify-center items-center text-xs" v-if="reachedTop">{{ $t("chat.reachedTop") }}</div>
+                    <!-- 消息列表 -->
                     <div class="flex items-start gap-2" v-for="item in messages" :key="item.id">
-                        <QQAvatar class="mt-2" :qq="item.qq" :name="item.name"></QQAvatar>
+                        <QQAvatar class="mt-2" :qq="item.user.qq" :name="item.user?.name"></QQAvatar>
                         <div class="flex flex-col">
-                            <div class="text-base-content/60 text-sm">{{ item.name }}</div>
-                            <div class="rounded-lg bg-base-100 p-2 px-3 select-text inline-block" v-html="sanitizeHTML(item.content)"></div>
+                            <div class="text-base-content/60 text-sm">{{ item.user.name }}</div>
+                            <div
+                                class="safe-html rounded-lg bg-base-100 select-text inline-flex flex-col text-sm max-w-80 overflow-hidden gap-2"
+                                :class="{ 'p-2': !isImage(item.content) }"
+                                v-html="sanitizeHTML(item.content)"
+                            ></div>
                         </div>
                     </div>
                 </div>
             </ScrollArea>
             <div class="flex-none w-full relative">
-                <div class="w-full absolute -mt-1 h-2 cursor-ns-resize z-100" v-h-resize-for="{ el: inputForm, min: 120, max: 400 }"></div>
+                <div class="w-full absolute -mt-[3px] h-[6px] cursor-ns-resize z-100" v-h-resize-for="{ el: inputForm, min: 120, max: 400 }"></div>
             </div>
             <!-- 输入 -->
-            <form class="h-44 flex flex-col relative" ref="inputForm" @submit="sendMessage">
+            <form class="h-44 flex flex-col relative border-t-[1px] border-base-300/50 pointer-events-none" ref="inputForm" @submit="sendMessage">
                 <div v-if="imgLoading" class="absolute top-0 left-0 bottom-0 right-0 cursor-progress z-100 flex justify-center items-center">
                     <span class="loading loading-spinner loading-md"></span>
                 </div>
                 <div class="flex-none p-1 px-2 border-t-[1px] border-base-300/50">
-                    <div class="btn btn-sm btn-square text-2xl hover:text-primary">
+                    <div class="btn btn-sm btn-square text-2xl hover:text-primary pointer-events-auto">
                         <Icon icon="la:smile" />
                     </div>
                 </div>
-                <ScrollArea class="flex-1 overflow-hidden" :class="{ 'pointer-events-none': imgLoading }">
+                <ScrollArea class="flex-1 overflow-hidden" :class="{ 'pointer-events-auto': !imgLoading }">
                     <div
                         ref="input"
                         id="msgInput"
                         contenteditable
-                        class="p-1 px-2 table-cell text-sm focus:outline-none"
+                        class="p-1 px-2 table-cell text-sm focus:outline-none text-wrap break-all overflow-x-hidden"
                         @keydown.enter="sendMessage"
                         @paste="onPaste"
                         dropzone="copy"
                     ></div>
                 </ScrollArea>
-                <div class="flex p-2">
+                <div class="flex p-2 pointer-events-auto">
                     <div class="flex-1"></div>
-                    <button class="btn btn-sm btn-primary px-6">发送</button>
+                    <button class="btn btn-sm btn-primary px-6" :disabled="imgLoading">{{ $t("chat.send") }}</button>
                 </div>
             </form>
         </div>
@@ -247,8 +293,8 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
         </div> -->
     </div>
 </template>
-<style>
-#msgInput img {
+<style lang="less">
+> #msgInput img {
     max-width: 200px;
     max-height: 200px;
 }
@@ -259,5 +305,11 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
 #msgInput * {
     display: inline;
     vertical-align: baseline;
+}
+
+.safe-html {
+    img {
+        border-radius: 0.3rem;
+    }
 }
 </style>

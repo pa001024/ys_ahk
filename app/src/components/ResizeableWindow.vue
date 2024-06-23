@@ -65,7 +65,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-    unlisten()
+    unlisten?.()
 })
 </script>
 <template>
@@ -152,7 +152,7 @@ onUnmounted(() => {
                 </div>
             </div>
             <!-- Body -->
-            <div :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-auto">
+            <div :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-hidden">
                 <slot></slot>
             </div>
         </div>

@@ -72,9 +72,9 @@ export class WSClient<MessageType = any> extends EventEmitter<WSEvent<MessageTyp
 
     createGQWSClient() {
         return createClient({
-            url: this.url,
+            url: this.url.replace("http", "ws"),
             webSocketImpl: this.getWebSocketImpl(),
-            lazy: true,
+            lazy: false,
             disablePong: true,
         })
     }

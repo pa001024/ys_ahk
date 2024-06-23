@@ -8,3 +8,4 @@ export function migrateDatabase() {
     const db = drizzle(sqlite)
     migrate(db, { migrationsFolder: "./drizzle" })
 }
+migrateDatabase()

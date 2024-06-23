@@ -5,12 +5,12 @@ import { useTranslation } from "i18next-vue"
 import SidebarButton from "./SidebarButton.vue"
 import { useState } from "../mod/state"
 import { useUIStore } from "../mod/state/ui"
-import Icon from "../components/Icon.vue"
+import type { IconTypes } from "../components/Icon.vue"
 
 const { t } = useTranslation()
 const target = ref<HTMLDivElement | null>(null)
 
-const tabs = [
+const tabs: { name: string; path: string; icon: IconTypes }[] = [
     {
         name: "home",
         path: "/",
@@ -64,7 +64,7 @@ watchEffect(() => {
             <SidebarButton v-for="tab in tabs" :to="tab.path" :key="tab.name" :tooltip="t(`${tab.name}.title`)">
                 <Icon :icon="tab.icon" />
             </SidebarButton>
-            <div class="flex-1"></div>
+            <div class="flex-1" data-tauri-drag-region></div>
             <SidebarButton to="/setting" :tooltip="t(`setting.title`)">
                 <Icon icon="la:cog-solid" />
             </SidebarButton>

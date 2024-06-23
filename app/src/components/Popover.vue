@@ -17,7 +17,7 @@ const emit = defineEmits(["close", "confirm"])
             <PopoverContent
                 :side="side ?? 'bottom'"
                 :side-offset="sideOffset ?? 5"
-                class="rounded p-2 w-[260px] bg-base-100 shadow-lg will-change-[transform,opacity] data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade"
+                class="rounded p-2 w-80 bg-base-100 shadow-lg will-change-[transform,opacity] data-[state=open]:data-[side=top]:animate-slideDownAndFade data-[state=open]:data-[side=right]:animate-slideLeftAndFade data-[state=open]:data-[side=bottom]:animate-slideUpAndFade data-[state=open]:data-[side=left]:animate-slideRightAndFade"
             >
                 <div class="flex flex-col justify-center">
                     <div class="flex justify-between items-center">

@@ -1,5 +1,5 @@
 // 定义允许的标签
-const allowedTags = new Set(["p", "span", "div", "b", "i", "strong", "em", "a"])
+const allowedTags = new Set(["br", "b", "i", "s", "u", "em", "a", "img"])
 
 // 定义允许的属性
 const allowedAttributes = new Set(["href", "style"])

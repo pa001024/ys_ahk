@@ -4,7 +4,7 @@ import ResizeableWindow from "./components/ResizeableWindow.vue"
 import { useSettingStore } from "./mod/state/setting"
 import { useRoute } from "vue-router"
 import { provideClient } from "@urql/vue"
-import { gqClientHttp } from "./mod/http/graphql"
+import { gqClient } from "./mod/http/graphql"
 const setting = useSettingStore()
 const route = useRoute()
 watchEffect(() => {
@@ -13,7 +13,7 @@ watchEffect(() => {
     document.documentElement.style.setProperty("--uiscale", String(setting.uiScale))
 })
 
-provideClient(gqClientHttp)
+provideClient(gqClient)
 </script>
 
 <template>

@@ -9,9 +9,10 @@ CREATE TABLE `logins` (
 --> statement-breakpoint
 CREATE TABLE `msgs` (
 	`id` text PRIMARY KEY NOT NULL,
-	`room_id` text,
-	`user_id` text,
-	`content` text,
+	`room_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`content` text NOT NULL,
+	`edited` integer,
 	`createdAt` text,
 	`updateAt` text,
 	FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`) ON UPDATE no action ON DELETE no action,
@@ -31,7 +32,7 @@ CREATE TABLE `rooms` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`type` text,
-	`owner_id` text,
+	`owner_id` text NOT NULL,
 	`max_users` integer,
 	`createdAt` text,
 	`updateAt` text,

@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Chat: typeof import('./components/Chat.vue')['default']
     ChatRoom: typeof import('./components/ChatRoom.vue')['default']
     CheckAnimationButton: typeof import('./components/CheckAnimationButton.vue')['default']
     Counter: typeof import('./components/Counter.vue')['default']
@@ -38,7 +39,10 @@ declare module 'vue' {
     ScrollAreaThumb: typeof import('radix-vue')['ScrollAreaThumb']
     ScrollAreaViewport: typeof import('radix-vue')['ScrollAreaViewport']
     Select: typeof import('./components/select/Select.vue')['default']
+    SelectGroup: typeof import('radix-vue')['SelectGroup']
     SelectItem: typeof import('./components/select/SelectItem.vue')['default']
+    SelectLabel: typeof import('radix-vue')['SelectLabel']
+    SelectSeparator: typeof import('radix-vue')['SelectSeparator']
     Sidebar: typeof import('./components/Sidebar.vue')['default']
     SidebarButton: typeof import('./components/SidebarButton.vue')['default']
     StatisticsProgress: typeof import('./components/StatisticsProgress.vue')['default']

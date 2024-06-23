@@ -1,5 +1,5 @@
 // 定义允许的标签
-const allowedTags = new Set(["span", "b", "i", "s", "u", "em", "a", "img"])
+const allowedTags = new Set(["br", "b", "i", "s", "u", "em", "a", "img"])
 
 // 定义允许的属性
 const allowedAttributes = new Set(["href", "src"])
@@ -30,4 +30,13 @@ export const sanitizeHTML = (inputHTML: string) => {
     }
 
     return doc.body.innerHTML
+}
+
+export const isImage = (inputHTML: string) => {
+    // 创建一个新的 DOMParser 实例
+    const parser = new DOMParser()
+    // 解析输入的 HTML 字符串
+    const doc = parser.parseFromString(inputHTML, "text/html")
+
+    return doc.body.children.length === 1 && doc.body.children[0].tagName.toLowerCase() === "img" && doc.body.children[0].hasAttribute("src") && doc.body.textContent?.trim() === ""
 }

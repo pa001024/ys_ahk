@@ -323,9 +323,14 @@ _login() {
     Click 991, 420
     A_Clipboard := array[index + 1]
     SendEvent "^v"
+    now := A_TickCount
     while not CheckColor(582, 512, "DEBC60") {
         Sleep 20
         Click 582, 512
+        if A_TickCount - now > 1e3
+            return false
+        else
+            Sleep 500
     }
     Sleep 40
     Click 797, 578 ; 登录

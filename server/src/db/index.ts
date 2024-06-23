@@ -1,14 +1,11 @@
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { Database } from "bun:sqlite"
 import * as schema from "./schema"
-import { migrateDatabase } from "./migrate"
 import { eq } from "drizzle-orm"
 
 export const db = drizzle(new Database("data.db"), {
     schema,
 })
-
-migrateDatabase()
 
 export { schema }
 export { yogaPlugin } from "./yoga"

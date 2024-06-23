@@ -4,7 +4,7 @@ import { useGameStore } from "../mod/state/game"
 import { useTranslation } from "i18next-vue"
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "radix-vue"
 import gsap from "gsap"
-import { ref, watchEffect } from "vue"
+import { FunctionDirective, ref, watchEffect, nextTick } from "vue"
 
 const game = useGameStore()
 const { t } = useTranslation()
@@ -60,11 +60,60 @@ function select_next() {
     }
 }
 
+async function import_accounts() {
+    const select_json = () =>
+        new Promise((resolve) => {
+            const input = document.createElement("input")
+            input.type = "file"
+            input.accept = ".json"
+            input.onchange = () => {
+                const file = input.files?.item(0)
+                if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (e) => {
+                        const json = e.target?.result as string
+                        if (json) {
+                            resolve(JSON.parse(json))
+                        }
+                    }
+                    reader.readAsText(file)
+                }
+            }
+            input.click()
+        })
+    const json = await select_json()
+    if (json) {
+        game.import_accounts(json)
+    }
+}
+
+function export_accounts() {
+    const data = game.export_accounts()
+    const blob = new Blob([data], { type: "text/json;charset=utf-8" })
+
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = "export_accounts.json"
+    a.click()
+}
+
+const editId = ref("")
+
 watchEffect(() => {
     if (game.selected) {
         scrollToCenter(game.selected)
     }
 })
+
+const vFocus: FunctionDirective = (el) => {
+    setTimeout(() => {
+        el.focus()
+    }, 1)
+    el.onblur = () => {
+        if (game.selected === editId.value) editId.value = ""
+        el.onblur = null
+    }
+}
 </script>
 
 <template>
@@ -118,6 +167,12 @@ watchEffect(() => {
             <Tooltip :tooltip="$t('game.clearAccounts')" side="top">
                 <CheckAnimationButton icon="la:broom-solid" @click="clear_accounts" />
             </Tooltip>
+            <Tooltip :tooltip="$t('game.import')" side="top">
+                <CheckAnimationButton noanimate icon="la:import" @click="import_accounts" />
+            </Tooltip>
+            <Tooltip :tooltip="$t('game.export')" side="top">
+                <CheckAnimationButton noanimate icon="la:export" @click="export_accounts" />
+            </Tooltip>
         </div>
         <div class="bg-base-100 p-4 w-full justify-items-center rounded-lg flex-1 flex flex-col overflow-hidden">
             <label class="label cursor-pointer space-x-2 group p-1 h-9">
@@ -134,9 +189,12 @@ watchEffect(() => {
                         <Tooltip v-if="acc.login && acc.pwd" :tooltip="$t('game.accountTypeP')" side="top">
                             <div class="rounded text-sm border p-0.5 px-1.5 size-6 text-center whitespace-nowrap">P</div>
                         </Tooltip>
-                        <span class="label-text flex-1 text-ellipsis overflow-hidden">
-                            {{ (acc.uid && `UID:${acc.uid}${acc.login ? ` (${acc.login})` : ""}`) || acc.login || acc.id.slice(0, 12) }}
+                        <span class="label-text flex-1 text-ellipsis overflow-hidden" v-if="acc.id !== editId" @click="game.selected === acc.id && (editId = acc.id)">
+                            {{ acc.desc ? `[${acc.desc}]` : "" }} {{ (acc.uid && `UID:${acc.uid}${acc.login ? ` (${acc.login})` : ""}`) || acc.login || acc.id.slice(0, 12) }}
                         </span>
+                        <div v-else>
+                            <input class="input input-xs w-full min-w-32" type="text" v-model="acc.desc" v-focus />
+                        </div>
                     </label>
                     <div class="join group-hover:opacity-100 opacity-0 transition-all duration-300 pr-4">
                         <Tooltip v-if="acc.login && acc.pwd" :tooltip="$t('game.copyTooltip')" side="top">

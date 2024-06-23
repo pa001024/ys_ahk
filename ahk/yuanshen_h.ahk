@@ -67,17 +67,6 @@ F4:: {
     ; API.AddUID(Format("{1:d} {2}", YSCounter.counter, format_time_diff(getTimeStamp() - t)))
 }
 
-; 计数器
-CapsLock & Numpad1:: YSCounter.Add(1)
-CapsLock & Numpad2:: YSCounter.Add(2)
-CapsLock & Numpad3:: YSCounter.Add(3)
-CapsLock & Numpad4:: YSCounter.Add(4)
-CapsLock & Numpad5:: YSCounter.Add(5)
-CapsLock & Numpad6:: YSCounter.Add(6)
-CapsLock & Numpad7:: YSCounter.Add(7)
-CapsLock & Numpad8:: YSCounter.Add(8)
-CapsLock & Numpad9:: YSCounter.Add(9)
-CapsLock & Numpad0:: YSCounter.Add(-1)
 
 F3:: _tp_f1(421, 364, 1218, 364) ; 传送利亚姆
 F5:: _tp_f1(718, 500, 995, 358) ; 传送龙溪

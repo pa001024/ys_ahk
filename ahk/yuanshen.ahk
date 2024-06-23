@@ -8,13 +8,10 @@ SetWorkingDir A_ScriptDir ; 设置工作目录
 SetTitleMatchMode 3
 SetCapsLockState 0
 
-#Include ahk/basic.ahk
-#Include ahk/yuanshen_c.ahk
-#Include ahk/gui.ahk
-; #Include ahk/yuanshen_h.ahk
-
-; 按键映射
-; Insert::=
+#Include basic.ahk
+#Include yuanshen_c.ahk
+#Include gui.ahk
+#Include yuanshen_h.ahk
 
 
 ; #HotIf WinActive("原神")
@@ -35,3 +32,5 @@ WatchClipboard(data) {
     _login()
   }
 }
+
+F12:: ExitApp

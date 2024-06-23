@@ -45,3 +45,9 @@ onMounted(() => {
         </ScrollAreaScrollbar>
     </ScrollAreaRoot>
 </template>
+
+<style lang="css">
+[data-radix-scroll-area-viewport] > div {
+    min-height: 100%;
+}
+</style>

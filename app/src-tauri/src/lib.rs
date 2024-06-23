@@ -1,3 +1,5 @@
+use serde::Deserialize;
+use serde::Serialize;
 use std::time::Duration;
 use tauri::menu::*;
 use tauri::tray::*;
@@ -40,6 +42,13 @@ fn get_regsk() -> String {
     return "".to_string();
 }
 
+#[derive(Serialize, Deserialize)]
+struct UIDCache {
+    uid: String,
+    usk: String,
+    usd: String,
+}
+
 #[tauri::command]
 fn get_uid() -> String {
     // 读取注册表
@@ -49,13 +58,19 @@ fn get_uid() -> String {
     if let Ok(sk) = sk {
         let val = sk
             .enum_values()
-            .map(|x| x.unwrap().0)
-            .filter(|x| x.starts_with("USD_"));
-        for name in val {
-            let uid = regex::Regex::new(r"USD_\d\d+").unwrap().find(&name);
+            .map(|x| x.unwrap())
+            .filter(|x| x.0.starts_with("USD_"));
+        for (name, value) in val {
+            let uid: Option<regex::Match> = regex::Regex::new(r"USD_\d\d+").unwrap().find(&name);
+
             if let Some(uid) = uid {
-                // let _ = sk.delete_value(name.clone());
-                return uid.as_str()[4..].to_string();
+                let usd = value.to_string();
+                let cache = UIDCache {
+                    uid: uid.as_str()[4..].to_string(),
+                    usk: name,
+                    usd,
+                };
+                return serde_json::to_string(&cache).unwrap();
             }
         }
     }

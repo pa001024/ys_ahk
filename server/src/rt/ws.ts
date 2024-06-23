@@ -2,10 +2,9 @@ import { ServerWebSocket } from "bun"
 import { Elysia } from "elysia"
 import { EventEmitter } from "events"
 import jwt from "jsonwebtoken"
-import { jwtToken } from "../db/mod"
 import type { ElysiaWS } from "elysia/dist/ws"
 import { GRAPHQL_TRANSPORT_WS_PROTOCOL, makeServer } from "graphql-ws"
-import { genSchema } from "../db/yoga"
+import { genSchema, jwtToken } from "../db/yoga"
 import { createSchema } from "graphql-yoga"
 
 export type WsServerEvent<T = {}, U extends Record<string, any> = {}> = {

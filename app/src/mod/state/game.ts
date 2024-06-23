@@ -8,7 +8,10 @@ import { useSettingStore } from "./setting"
 
 interface Account {
     id: string
+    desc?: string
     uid?: string
+    usk?: string
+    usd?: string
     regsk?: string
     login?: string
     pwd?: string
@@ -97,9 +100,11 @@ export const useGameStore = defineStore("game", {
             this.selected = next
             return true
         },
+
         clear_accounts() {
             this.accounts = this.accounts.filter((s) => s.lock)
         },
+
         async filter_accounts() {
             // 云链查询
             const setting = useSettingStore()
@@ -128,6 +133,7 @@ export const useGameStore = defineStore("game", {
             this.accounts = merge(this.accounts, added)
             return added.length
         },
+
         lock_account(id: string) {
             const account = this.accounts.find((s) => s.id === id)
             if (account) {
@@ -135,9 +141,11 @@ export const useGameStore = defineStore("game", {
                 else account.lock = true
             }
         },
+
         delete_account(id: string) {
             this.accounts = this.accounts.filter((s) => s.lock || s.id !== id)
         },
+
         copy_account(id: string) {
             const account = this.accounts.find((s) => s.id === id)
             if (account) {
@@ -148,6 +156,7 @@ export const useGameStore = defineStore("game", {
                 }
             }
         },
+
         async check_current_account() {
             const regsk = await get_regsk()
             const acc = this.accounts.find((s) => s.regsk === regsk)
@@ -155,14 +164,17 @@ export const useGameStore = defineStore("game", {
                 this.selected = acc.id
             }
         },
+
         async add_account_reg() {
             const regsk = await get_regsk()
             if (this.selected) {
                 const acc = this.accounts.find((s) => s.id === this.selected)
                 if (acc) {
                     if (!acc.uid) {
-                        const uid = (await invoke("get_uid")) as string
+                        const { uid, usk, usd } = (await invoke("get_uid")) as { uid: string; usk: string; usd: string }
                         acc.uid = uid
+                        acc.usk = usk
+                        acc.usd = usd
                     }
                     if (acc.login && acc.pwd) {
                         acc.regsk = regsk
@@ -173,23 +185,34 @@ export const useGameStore = defineStore("game", {
             const added = { id: hash(regsk), regsk }
             this.accounts = merge(this.accounts, [added])
         },
+
         async update_account_reg(id: string) {
             let account = this.accounts.find((s) => s.id === id)
             if (account) {
                 account.regsk = await get_regsk()
             }
         },
-        async update_account_uid(id: string, uid: string) {
+
+        update_account_uid(id: string, uid: string) {
             let account = this.accounts.find((s) => s.id === id)
             if (account) {
                 account.uid = uid
             }
         },
+
+        update_account_desc(id: string, desc: string) {
+            let account = this.accounts.find((s) => s.id === id)
+            if (account) {
+                account.desc = desc
+            }
+        },
+
         async import_accounts_from_cliboard() {
             const text = await clipboard.readText()
             const added = this.add_accounts(...text.split("\n"))
             return added
         },
+
         async launch_game() {
             if (this.selected) {
                 const account = this.accounts.find((s) => s.id === this.selected)
@@ -221,6 +244,14 @@ export const useGameStore = defineStore("game", {
             if (this.running) await this.kill_game()
             this.selected = id
             await this.launch_game()
+        },
+
+        export_accounts() {
+            return JSON.stringify(this.accounts)
+        },
+
+        import_accounts(data: any) {
+            this.accounts = merge(this.accounts, data)
         },
     },
 })
