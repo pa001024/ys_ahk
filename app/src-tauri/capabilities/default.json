@@ -47,6 +47,11 @@
         {
             "identifier": "http:default",
             "allow": [{ "url": "http://47.116.207.238:8001/*" }, { "url": "https://xn--chq26veyq.icu/*" }]
-        }
+        },
+        "game:allow-kill-game",
+        "game:allow-get-regsk",
+        "game:allow-get-uid",
+        "game:allow-set-regsk",
+        "game:allow-get-game"
     ]
 }

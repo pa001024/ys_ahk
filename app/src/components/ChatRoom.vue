@@ -24,7 +24,7 @@ const reachedTop = ref(false)
 const loadingTop = ref(false)
 const messages = ref<Msg[]>([])
 
-async function getMsgs() {
+async function getMsgs(online: boolean, offset: number = 0) {
     const { data } = await gqClient
         .query<{ msgs: Msg[] }>(
             gql`
@@ -42,8 +42,8 @@ async function getMsgs() {
                     }
                 }
             `,
-            { room_id: props.roomId, limit: 10, offset: messages.value.length },
-            { requestPolicy: "cache-and-network" }
+            { room_id: props.roomId, limit: 10, offset },
+            { requestPolicy: online ? "network-only" : "cache-only" }
         )
         .toPromise()
     return data?.msgs
@@ -51,8 +51,22 @@ async function getMsgs() {
 
 async function loadHistory() {
     messages.value = []
-    const msgs = await getMsgs()
-    if (msgs) {
+    const roomId = props.roomId
+    const msgsCache = await getMsgs(false)
+    if (msgsCache) {
+        reachedTop.value = false
+        messages.value = msgsCache
+
+        nextTick(() => {
+            el.value?.scrollTo({
+                top: el.value.scrollHeight,
+                left: 0,
+                // behavior: "smooth",
+            })
+        })
+    }
+    const msgs = await getMsgs(true)
+    if (msgs && roomId === props.roomId) {
         reachedTop.value = false
         messages.value = msgs
 
@@ -97,12 +111,7 @@ useSubscription<{ newMessage: Msg }, Msg[]>(
 const { executeMutation: sendMessageMut } = useMutation(gql`
     mutation ($content: String!, $room_id: String!) {
         sendMessage(content: $content, room_id: $room_id) {
-            success
-            message
-            msg {
-                id
-                createdAt
-            }
+            id
         }
     }
 `)
@@ -112,23 +121,21 @@ const nowSeconds = computed(() => ~~(time.value / 1000))
 
 useInfiniteScroll(
     el,
-    () => {
-        nextTick(async () => {
-            if (messages.value.length < 10 || (arrivedState.top && arrivedState.bottom)) return
-            // load more
-            const oriH = el.value!.scrollHeight
-            if (reachedTop.value) return
-            loadingTop.value = true
-            const msgs = await getMsgs()
-            loadingTop.value = false
-            if (!msgs || msgs.length === 0) {
-                reachedTop.value = true
-                return
-            }
-            messages.value.unshift(...msgs)
-            nextTick(() => {
-                el.value!.scrollTop = el.value!.scrollHeight - oriH
-            })
+    async () => {
+        if (messages.value.length < 10 || (arrivedState.top && arrivedState.bottom) || loadingTop.value) return
+        // load more
+        const oriH = el.value!.scrollHeight
+        if (reachedTop.value) return
+        loadingTop.value = true
+        const msgs = await getMsgs(true, messages.value.length)
+        loadingTop.value = false
+        if (!msgs || msgs.length === 0) {
+            reachedTop.value = true
+            return
+        }
+        messages.value.unshift(...msgs)
+        nextTick(() => {
+            el.value!.scrollTop = el.value!.scrollHeight - oriH
         })
     },
     { distance: 20, direction: "top" }
@@ -161,11 +168,10 @@ async function sendMessage(e: Event) {
     const html = input.value?.innerHTML
     if (!html) return
     const content = sanitizeHTML(html)
-    const { data } = await sendMessageMut({ content, room_id: props.roomId })
-    if (data?.sendMessage.success) {
-        input.value!.innerHTML = ""
-        input.value!.focus()
-    }
+    if (!content) return
+    input.value!.innerHTML = ""
+    input.value!.focus()
+    await sendMessageMut({ content, room_id: props.roomId })
 }
 
 const imgLoading = ref(false)
@@ -244,7 +250,7 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
                     </div>
                     <div class="flex justify-center items-center text-xs" v-if="reachedTop">{{ $t("chat.reachedTop") }}</div>
                     <!-- 消息列表 -->
-                    <div class="flex items-start gap-2" v-for="item in messages" :key="item.id">
+                    <div class="group flex items-start gap-2" v-for="item in messages" :key="item.id">
                         <QQAvatar class="mt-2" :qq="item.user.qq" :name="item.user?.name"></QQAvatar>
                         <div class="flex flex-col">
                             <div class="text-base-content/60 text-sm">{{ item.user.name }}</div>
@@ -254,6 +260,8 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
                                 v-html="sanitizeHTML(item.content)"
                             ></div>
                         </div>
+                        <div class="flex-1"></div>
+                        <div class="hidden group-hover:block p-1 text-xs text-base-content/60">{{ item.createdAt }}</div>
                     </div>
                 </div>
             </ScrollArea>

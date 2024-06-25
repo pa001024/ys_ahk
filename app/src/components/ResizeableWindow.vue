@@ -52,10 +52,10 @@ function handleClose() {
     invoke("app_close").catch(() => exit())
 }
 
-async function handlePin() {
+watch(alwaysOnTop, async (newValue) => {
     await appWindow.setAlwaysOnTop(!alwaysOnTop.value)
-    alwaysOnTop.value = !alwaysOnTop.value
-}
+})
+
 let unlisten: Function
 
 onMounted(async () => {
@@ -133,7 +133,7 @@ onUnmounted(() => {
                             </svg>
                         </label>
                         <Tooltip side="bottom" :tooltip="alwaysOnTop ? $t('main.btn_unpin_window') : $t('main.btn_pin_window')">
-                            <button class="btn btn-ghost btn-sm btn-square" @click="handlePin">
+                            <button class="btn btn-ghost btn-sm btn-square" @click="alwaysOnTop = !alwaysOnTop">
                                 <Icon bold icon="ri:pushpin-2-fill" v-if="alwaysOnTop" />
                                 <Icon bold icon="ri:pushpin-fill" v-else />
                             </button>
@@ -152,9 +152,9 @@ onUnmounted(() => {
                 </div>
             </div>
             <!-- Body -->
-            <div :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-hidden">
+            <ScrollArea :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-hidden">
                 <slot></slot>
-            </div>
+            </ScrollArea>
         </div>
     </div>
 </template>

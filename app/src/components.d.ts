@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AutoPage: typeof import('./components/AutoPage.vue')['default']
     Chat: typeof import('./components/Chat.vue')['default']
     ChatRoom: typeof import('./components/ChatRoom.vue')['default']
     CheckAnimationButton: typeof import('./components/CheckAnimationButton.vue')['default']
@@ -21,6 +22,8 @@ declare module 'vue' {
     DialogTitle: typeof import('radix-vue')['DialogTitle']
     DialogTrigger: typeof import('radix-vue')['DialogTrigger']
     Dropdown: typeof import('./components/Dropdown.vue')['default']
+    GQAutoPage: typeof import('./components/GQAutoPage.vue')['default']
+    GQQuery: typeof import('./components/GQQuery.vue')['default']
     Icon: typeof import('./components/Icon.vue')['default']
     Popover: typeof import('./components/Popover.vue')['default']
     PopoverArrow: typeof import('radix-vue')['PopoverArrow']
@@ -30,6 +33,7 @@ declare module 'vue' {
     PopoverRoot: typeof import('radix-vue')['PopoverRoot']
     PopoverTrigger: typeof import('radix-vue')['PopoverTrigger']
     QQAvatar: typeof import('./components/QQAvatar.vue')['default']
+    Query: typeof import('./components/Query.vue')['default']
     ResizeableWindow: typeof import('./components/ResizeableWindow.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

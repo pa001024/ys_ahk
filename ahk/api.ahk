@@ -17,8 +17,8 @@ class API {
         url := this.baseUrl . 'list'
         return StrSplit(httpRequest(url), ",")
     }
-    static PullUID(uid) {
-        url := this.baseUrl . 'pull'
+    static PollUID(uid) {
+        url := this.baseUrl . 'poll'
         return httpRequest(url)
     }
     static AddUID(uid) {

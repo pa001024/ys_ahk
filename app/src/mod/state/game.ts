@@ -19,10 +19,10 @@ interface Account {
 }
 
 async function get_regsk() {
-    return (await invoke("get_regsk")) as string
+    return (await invoke("plugin:game|get_regsk")) as string
 }
 async function set_regsk(str: string) {
-    return (await invoke("set_regsk", { str })) as void
+    return (await invoke("plugin:game|set_regsk", { str })) as void
 }
 
 function hash(s: string) {
@@ -48,7 +48,7 @@ function sleep(ms: number) {
 setTimeout(async () => {
     const game = useGameStore()
     while (true) {
-        const running = (await invoke("get_game", { isRun: game.running })) as boolean
+        const running = (await invoke("plugin:game|get_game", { isRun: game.running })) as boolean
         if (game.running !== running) {
             game.running = running
             game.liveTime = Date.now()
@@ -171,7 +171,7 @@ export const useGameStore = defineStore("game", {
                 const acc = this.accounts.find((s) => s.id === this.selected)
                 if (acc) {
                     if (!acc.uid) {
-                        const { uid, usk, usd } = (await invoke("get_uid")) as { uid: string; usk: string; usd: string }
+                        const { uid, usk, usd } = (await invoke("plugin:game|get_uid")) as { uid: string; usk: string; usd: string }
                         acc.uid = uid
                         acc.usk = usk
                         acc.usd = usd
@@ -237,7 +237,7 @@ export const useGameStore = defineStore("game", {
         },
 
         async kill_game() {
-            return (await invoke("kill_game")) as boolean
+            return (await invoke("plugin:game|kill_game")) as boolean
         },
 
         async switch_account(id: string) {

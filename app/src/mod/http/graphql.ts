@@ -5,6 +5,7 @@ import { SubscribePayload, createClient } from "graphql-ws"
 import { offlineExchange } from "@urql/exchange-graphcache"
 import { makeDefaultStorage } from "@urql/exchange-graphcache/default-storage"
 import { nanoid } from "nanoid"
+// import schema from "../../schema.json"
 
 const storage = makeDefaultStorage({
     idbName: "graphcache-v3", // The name of the IndexedDB database
@@ -12,11 +13,12 @@ const storage = makeDefaultStorage({
 })
 
 const cacheExchange = offlineExchange({
+    // schema,
     storage,
     updates: {
-        Mutation: {
-            sendMessage: (result: any, args, cache, _info) => {
-                if (!result.sendMessage?.success) return
+        Mutation: {},
+        Subscription: {
+            newMessage(result: any, args, cache, _info) {
                 const fragment = gql`
                     fragment _ on Room {
                         id
@@ -32,9 +34,8 @@ const cacheExchange = offlineExchange({
                         }
                     }
                 `
-                const msg = result.sendMessage.msg
-                const token = useSettingStore().token
-                const user = JSON.parse(atob(token.split(".")[1]))
+
+                const msg = result.newMessage
                 cache.writeFragment(fragment, {
                     id: args.room_id,
                     msgs: [
@@ -45,9 +46,9 @@ const cacheExchange = offlineExchange({
                             createdAt: msg.createdAt,
                             user: {
                                 __typename: "User",
-                                id: user.id,
-                                name: user.name,
-                                qq: user.qq,
+                                id: msg.user.id,
+                                name: msg.user.name,
+                                qq: msg.user.qq,
                             },
                         },
                     ],

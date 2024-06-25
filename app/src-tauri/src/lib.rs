@@ -1,130 +1,23 @@
-use serde::Deserialize;
-use serde::Serialize;
-use std::time::Duration;
 use tauri::menu::*;
 use tauri::tray::*;
 use tauri::Manager;
-use util::*;
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 use window_vibrancy::*;
-use winreg::enums::*;
-use winreg::RegKey;
-use winreg::RegValue;
 
-mod util;
+mod services;
 
+// 退出程序
 #[tauri::command]
-async fn kill_game() -> bool {
-    let pid = get_procees_by_name("YuanShen.exe").unwrap_or(0);
-    if pid > 0 {
-        if let Ok(killed) = kill_process(pid) {
-            if killed {
-                get_game(true).await;
-            }
-            return killed;
-        }
-    }
-    false
-}
+async fn app_close(app_handle: tauri::AppHandle) {
+    let Some(window) = app_handle.get_webview_window("main") else {
+        return app_handle.exit(0);
+    };
+    app_handle.save_window_state(StateFlags::all()).ok(); // don't really care if it saves it
 
-#[tauri::command]
-fn get_regsk() -> String {
-    // 读取注册表
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = "Software\\miHoYo\\原神";
-    let value = "MIHOYOSDK_ADL_PROD_CN_h3123967166";
-    let sk = hkcu.open_subkey(key);
-    if let Ok(sk) = sk {
-        let val = sk.get_raw_value(value);
-        if let Ok(val) = val {
-            return String::from_utf8(val.bytes).unwrap();
-        }
-    }
-    return "".to_string();
-}
-
-#[derive(Serialize, Deserialize)]
-struct UIDCache {
-    uid: String,
-    usk: String,
-    usd: String,
-}
-
-#[tauri::command]
-fn get_uid() -> String {
-    // 读取注册表
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = "Software\\miHoYo\\原神";
-    let sk = hkcu.open_subkey_with_flags(key, KEY_READ);
-    if let Ok(sk) = sk {
-        let val = sk
-            .enum_values()
-            .map(|x| x.unwrap())
-            .filter(|x| x.0.starts_with("USD_"));
-        for (name, value) in val {
-            let uid: Option<regex::Match> = regex::Regex::new(r"USD_\d\d+").unwrap().find(&name);
-
-            if let Some(uid) = uid {
-                let usd = value.to_string();
-                let cache = UIDCache {
-                    uid: uid.as_str()[4..].to_string(),
-                    usk: name,
-                    usd,
-                };
-                return serde_json::to_string(&cache).unwrap();
-            }
-        }
-    }
-    return "".to_string();
-}
-
-#[tauri::command]
-fn set_regsk(str: String) {
-    // 写入注册表
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let key = "Software\\miHoYo\\原神";
-    let value = "MIHOYOSDK_ADL_PROD_CN_h3123967166";
-    let sk = hkcu.open_subkey_with_flags(key, KEY_SET_VALUE | KEY_READ);
-    if let Ok(sk) = sk {
-        // 删除所有UID缓存
-        let val = sk
-            .enum_values()
-            .map(|x| x.unwrap().0)
-            .filter(|x| x.starts_with("USD_"));
-        for name in val {
-            let uid = regex::Regex::new(r"USD_\d\d+").unwrap().find(&name);
-            if let Some(_uid) = uid {
-                let _ = sk.delete_value(name.clone());
-                println!("Delete UID KEY: {}", name)
-                // return uid.as_str()[4..].to_string();
-            }
-        }
-
-        let val = RegValue {
-            vtype: REG_BINARY,
-            bytes: str.as_bytes().to_vec(), //str.bytes().chain(std::iter::once(0)).collect(),
-        };
-        sk.set_raw_value(value, &val).unwrap();
+    if let Err(_) = window.close() {
+        return app_handle.exit(0);
     }
 }
-
-// 等待游戏启动状态变化再返回
-#[tauri::command]
-async fn get_game(is_run: bool) -> bool {
-    let mut elapsed = Duration::from_secs(0);
-    let timeout = Duration::from_secs(30);
-    let interval = Duration::from_millis(500); // 500ms
-
-    while elapsed <= timeout {
-        let now_is_run = get_procees_by_name("YuanShen.exe").unwrap_or(0) > 0;
-        if now_is_run != is_run {
-            return now_is_run;
-        }
-        tokio::time::sleep(interval).await;
-        elapsed += interval;
-    }
-    is_run
-}
-
 #[tauri::command]
 fn apply_material(window: tauri::WebviewWindow, material: &str) -> String {
     if material == "Acrylic" && apply_acrylic(&window, Some((0, 0, 0, 0))).is_err() {
@@ -149,10 +42,12 @@ pub fn run() {
         // .plugin(tauri_plugin_os::init())
         // .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(services::game::init())
         .setup(|app| {
             let handle = app.handle();
             let window = app.get_webview_window("main").unwrap();
@@ -249,37 +144,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            get_regsk,
-            get_uid,
-            set_regsk,
-            get_game,
-            kill_game,
-            apply_material
-        ])
+        .invoke_handler(tauri::generate_handler![apply_material, app_close])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::util::get_procees_by_name;
-
-    #[test]
-    fn test_get_procees() {
-        let rst = get_procees_by_name("YuanShen.exe").unwrap();
-        println!("rst: {}", rst);
-    }
-
-    #[test]
-    fn test_get_regsk() {
-        let rst = crate::get_regsk();
-        println!("rst: {}", rst);
-    }
-
-    #[test]
-    fn test_get_uid() {
-        let rst = crate::get_uid();
-        println!("rst: {}", rst);
-    }
 }

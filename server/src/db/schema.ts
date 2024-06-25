@@ -12,9 +12,7 @@ function now() {
 export const users = sqliteTable(
     "users",
     {
-        id: text("id")
-            .$defaultFn(() => nanoid())
-            .primaryKey(),
+        id: text("id").$default(nanoid).primaryKey(),
         email: text("email").notNull().unique(),
         name: text("name"),
         qq: text("qq"),
@@ -35,9 +33,7 @@ export const userRelations = relations(users, ({ one }) => ({
 export const logins = sqliteTable(
     "logins",
     {
-        id: text("id")
-            .$defaultFn(() => nanoid())
-            .primaryKey(),
+        id: text("id").$default(nanoid).primaryKey(),
         user_id: text("user_id").notNull(),
         ip: text("ip"),
         ua: text("ua"),
@@ -56,9 +52,7 @@ export const loginsRelations = relations(logins, ({ one }) => ({
 export const passwords = sqliteTable(
     "passwords",
     {
-        id: text("id")
-            .$defaultFn(() => nanoid())
-            .primaryKey(),
+        id: text("id").$default(nanoid).primaryKey(),
         user_id: text("user_id").notNull(),
         hash: text("hash").notNull(),
         createdAt: text("createdAt").$default(now),
@@ -73,9 +67,7 @@ export const passwords = sqliteTable(
 export const rooms = sqliteTable(
     "rooms",
     {
-        id: text("id")
-            .$defaultFn(() => nanoid())
-            .primaryKey(),
+        id: text("id").$default(nanoid).primaryKey(),
         name: text("name").notNull(),
         type: text("type"),
         owner_id: text("owner_id").notNull(),
@@ -91,14 +83,35 @@ export const rooms = sqliteTable(
 export const roomsRelations = relations(rooms, ({ one, many }) => ({
     owner: one(users, { fields: [rooms.owner_id], references: [users.id] }),
     msgs: many(msgs, { relationName: "room" }),
+    views: many(roomViews, { relationName: "room" }),
 }))
 
+/** 房间查看 */
+export const roomViews = sqliteTable(
+    "roomViews",
+    {
+        id: text("id").$default(nanoid).primaryKey(),
+        room_id: text("room_id").notNull(),
+        user_id: text("user_id").notNull(),
+        createdAt: text("createdAt").$default(now),
+        updateAt: text("updateAt").$onUpdate(now),
+    },
+    (roomViews) => ({
+        room_idFk: foreignKey({ columns: [roomViews.room_id], foreignColumns: [rooms.id] }),
+        user_idFk: foreignKey({ columns: [roomViews.user_id], foreignColumns: [users.id] }),
+    })
+)
+
+export const roomViewsRelations = relations(roomViews, ({ one }) => ({
+    room: one(rooms, { fields: [roomViews.room_id], references: [rooms.id], relationName: "room" }),
+    user: one(users, { fields: [roomViews.user_id], references: [users.id], relationName: "user" }),
+}))
+
+/** 消息 */
 export const msgs = sqliteTable(
     "msgs",
     {
-        id: text("id")
-            .$defaultFn(() => nanoid())
-            .primaryKey(),
+        id: text("id").$default(nanoid).primaryKey(),
         room_id: text("room_id").notNull(),
         user_id: text("user_id").notNull(),
         content: text("content").notNull(),

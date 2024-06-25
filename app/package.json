@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "codegen": "graphql-codegen"
+    "gen": "bun src/gen.ts"
   },
   "dependencies": {
     "@floating-ui/vue": "^1.0.6",
@@ -57,9 +57,11 @@
     "@tauri-apps/cli": "^2.0.0-beta.20",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20.14.5",
+    "@urql/introspection": "^1.1.0",
     "@vitejs/plugin-vue": "^5.0.5",
     "autoprefixer": "^10.4.19",
     "daisyui": "^4.12.2",
+    "node-fetch": "^3.3.2",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",

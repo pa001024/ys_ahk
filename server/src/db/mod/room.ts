@@ -1,12 +1,13 @@
 import type { CreateMobius, Resolver } from "graphql-mobius"
 import { db, schema } from ".."
 import { Context } from "../yoga"
-import { like } from "drizzle-orm"
+import { eq, like } from "drizzle-orm"
 import { getSubSelection } from "."
 
 export const typeDefs = /* GraphQL */ `
     type Mutation {
-        createRoom(data: RoomsCreateInput!): RoomsCreateResult!
+        createRoom(data: RoomsCreateInput!): Room
+        deleteroom(id: String!): Boolean!
     }
 
     type Query {
@@ -24,7 +25,7 @@ export const typeDefs = /* GraphQL */ `
         updateAt: String
 
         owner: User
-        msgs(limit: Int): [Msg!]
+        msgs(limit: Int = 1): [Msg!]
     }
 
     type RoomFilter {
@@ -55,7 +56,7 @@ export const resolvers = {
                     owner: true,
                     msgs: msgsSel
                         ? {
-                              limit: msgsSel.arguments.find((arg: any) => arg.name.value === "limit")?.value.value || 1,
+                              limit: msgsSel.getArg("limit") || 1,
                               orderBy: (t, { desc, sql }) => desc(sql`rowid`),
                               with: { user: true },
                           }
@@ -76,7 +77,7 @@ export const resolvers = {
     Mutation: {
         createRoom: async (parent, { data: { name, type, max_users } }, context, info: any) => {
             const user = context.user
-            if (!user) return { success: false, message: "Unauthorized" }
+            if (!user) return null
             const rst = (
                 await db
                     .insert(schema.rooms)
@@ -93,11 +94,22 @@ export const resolvers = {
                 const room = await db.query.rooms.findFirst({
                     with: { owner: true },
                 })
-                if (room) {
-                    return { success: true, message: "Room created successfully", room }
-                }
+                return room
             }
-            return { success: false, message: "Room already exists" }
+            return null
+        },
+        deleteroom: async (parent, { id }, context, info) => {
+            const user = context.user
+            if (!user) return false
+            const room = await db.query.rooms.findFirst({
+                where: eq(schema.rooms.id, id),
+                with: { owner: true },
+            })
+            if (room && room.owner_id === user.id) {
+                await db.delete(schema.rooms).where(eq(schema.rooms.id, id)).execute()
+                return true
+            }
+            return false
         },
     },
 } satisfies Resolver<CreateMobius<typeof typeDefs>, Context>

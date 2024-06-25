@@ -32,6 +32,22 @@ export const sanitizeHTML = (inputHTML: string) => {
     return doc.body.innerHTML
 }
 
+export const htmlToText = (inputHTML: string) => {
+    // 创建一个新的 DOMParser 实例
+    const parser = new DOMParser()
+    // 解析输入的 HTML 字符串
+    const doc = parser.parseFromString(inputHTML, "text/html")
+
+    // 替换img标签到[图片]
+    const imgs = doc.body.querySelectorAll("img")
+    for (let i = 0; i < imgs.length; i++) {
+        const img = imgs[i]
+        img.parentNode?.replaceChild(doc.createTextNode("[图片]"), img)
+    }
+
+    return doc.body.textContent || ""
+}
+
 export const isImage = (inputHTML: string) => {
     // 创建一个新的 DOMParser 实例
     const parser = new DOMParser()

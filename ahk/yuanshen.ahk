@@ -15,7 +15,10 @@ SetCapsLockState 0
 
 
 ; #HotIf WinActive("原神")
-; ~F2:: _auto_enter_uniq()
+; ~F2:: {
+;   A_Clipboard := httpRequest("http://47.94.95.163:8887/r/123/poll?user=🦈")
+;   _auto_enter_uniq()
+; }
 
 
 OnClipboardChange WatchClipboard
