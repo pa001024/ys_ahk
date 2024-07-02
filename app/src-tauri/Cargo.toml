@@ -21,10 +21,18 @@ windows-core = "0.57"
 windows = { version = "0.57", features = [
     "Win32_Foundation",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_SystemInformation",
+    "Win32_System_SystemServices",
     "Win32_System_Memory",
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
+    "Win32_Security",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Registry",
 ] }
+widestring = "1"
 tokio = { version = "1", features = ["full"] }
 tauri = { version = "2.0.0-beta", features = ["tray-icon", "image-ico"] }
 serde = { version = "1", features = ["derive"] }

@@ -5,6 +5,7 @@ import * as clipboard from "@tauri-apps/plugin-clipboard-manager"
 import { SHA1, enc } from "crypto-js"
 import { invoke } from "@tauri-apps/api/core"
 import { useSettingStore } from "./setting"
+import { env } from "../../env"
 
 interface Account {
     id: string
@@ -45,27 +46,29 @@ function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-setTimeout(async () => {
-    const game = useGameStore()
-    while (true) {
-        const running = (await invoke("plugin:game|get_game", { isRun: game.running })) as boolean
-        if (game.running !== running) {
-            game.running = running
-            game.liveTime = Date.now()
+if (env.isApp) {
+    setTimeout(async () => {
+        const game = useGameStore()
+        while (true) {
+            const running = (await invoke("plugin:game|get_game", { isRun: game.running })) as boolean
+            if (game.running !== running) {
+                game.running = running
+                game.liveTime = Date.now()
+            }
+            const date = new Date().toLocaleDateString("zh")
+            // 新的一天重新计时
+            if (date !== game.liveDate) {
+                game.liveDate = date
+                game.liveDiff = 0
+            }
+            if (running) {
+                game.liveDiff += Date.now() - game.liveTime
+                game.liveTime = Date.now()
+            }
+            await sleep(100)
         }
-        const date = new Date().toLocaleDateString("zh")
-        // 新的一天重新计时
-        if (date !== game.liveDate) {
-            game.liveDate = date
-            game.liveDiff = 0
-        }
-        if (running) {
-            game.liveDiff += Date.now() - game.liveTime
-            game.liveTime = Date.now()
-        }
-        await sleep(100)
-    }
-}, 1e3)
+    }, 1e3)
+}
 
 export const useGameStore = defineStore("game", {
     state: () => {
@@ -225,8 +228,8 @@ export const useGameStore = defineStore("game", {
             }
             if (this.path && this.pathEnable) {
                 console.log("game start")
-                // await invoke("exec_arg", { path: game.path, args: game.pathParams.split(" ") })
-                await shell.Command.create("cmd", ["/c", this.path, ...this.pathParams.split(" ")]).execute()
+                await invoke("plugin:game|launch_game", { path: this.path, cmds: this.pathParams, unlock: true })
+                // await shell.Command.create("cmd", ["/c", this.path, ...this.pathParams.split(" ")]).execute()
                 // await shell.open(game.path)
                 console.log("game exited")
             }

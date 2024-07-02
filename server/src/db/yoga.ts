@@ -1,40 +1,26 @@
 import Elysia from "elysia"
 import jwt from "jsonwebtoken"
 import { createSchema, createYoga, type YogaInitialContext } from "graphql-yoga"
-import { buildSchema } from "drizzle-graphql"
-// import { useSofa } from "@graphql-yoga/plugin-sofa"
 import { machineIdSync } from "node-machine-id"
 import { useGraphQlJit } from "@envelop/graphql-jit"
-// import pkg from "../../package.json"
 import { schemaWith } from "./mod"
-import { db } from "."
-// import { useSofa } from "sofa-api"
 import { makeHandler as makeWSHandler } from "graphql-ws/lib/use/bun"
+import { pubsub } from "../rt/pubsub"
 
 export const genSchema = () => {
-    const { entities } = buildSchema(db, { mutations: false })
-    const { typeDefs, resolvers } = schemaWith(entities)
+    const { typeDefs, resolvers } = schemaWith({})
 
     return {
-        typeDefs: [...typeDefs],
-        resolvers: {
-            Query: {
-                ...resolvers.Query,
-            },
-            Mutation: {
-                ...resolvers.Mutation,
-            },
-            Subscription: {
-                ...resolvers.Subscription,
-            },
-        },
+        typeDefs,
+        resolvers,
     }
 }
 
-export type Context = YogaInitialContext & JWTContext
+export type Context = YogaInitialContext & CustomContext
 
-export type JWTContext = {
+export type CustomContext = {
     user?: JWTUser
+    pubsub: typeof pubsub
 }
 
 export interface JWTUser {
@@ -49,18 +35,18 @@ export function yogaPlugin() {
         ...genSchema(),
     })
     return (app: Elysia) => {
-        const yoga = createYoga({
+        const yoga = createYoga<CustomContext>({
             cors: false,
-            schema,
+            schema: schema as any,
             context: (ctx) => {
                 const token = ctx.request.headers?.get("token")
+                let user: JWTUser | undefined = void 0
                 if (token) {
                     try {
-                        const user = jwt.verify(token, jwtToken) as JWTUser
-                        return { user }
+                        user = jwt.verify(token, jwtToken) as JWTUser
                     } catch {}
                 }
-                return {}
+                return { user, pubsub }
             },
             plugins: [useGraphQlJit()],
             graphiql: {

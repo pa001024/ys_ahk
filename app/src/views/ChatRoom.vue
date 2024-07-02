@@ -1,97 +1,55 @@
 <script lang="ts" setup>
 import { useTimestamp } from "@vueuse/core"
-import { useInfiniteScroll, useScroll } from "@vueuse/core"
-import { FunctionDirective, computed, nextTick, onMounted, ref, watch } from "vue"
+import { useScroll } from "@vueuse/core"
+import { FunctionDirective, computed, ref } from "vue"
 import { isImage, sanitizeHTML } from "../mod/util/html"
-import { gql, useMutation, useQuery, useSubscription } from "@urql/vue"
-import { gqClient } from "../mod/http/graphql"
+import { gql, useMutation, useSubscription } from "@urql/vue"
+import { useSettingStore } from "../mod/state/setting"
+import { useRoute } from "vue-router"
 
-const props = defineProps<{ roomId: string }>()
-const roomId = computed(() => props.roomId)
+const route = useRoute()
+const roomId = computed(() => route.params.room as string)
+const setting = useSettingStore()
 
 const el = ref<HTMLElement | null>(null)
 
 const { arrivedState } = useScroll(el, { offset: { left: 0, top: 20, right: 0, bottom: 200 } })
 
+const Query = /* GraphQL */ `
+    query ($roomId: String!, $limit: Int, $offset: Int) {
+        msgs(roomId: $roomId, limit: $limit, offset: $offset) {
+            id
+            edited
+            content
+            createdAt
+            roomId
+            user {
+                id
+                name
+                qq
+            }
+        }
+    }
+`
+const variables = computed(() => ({ roomId: roomId.value }))
+
 type Msg = {
     id: string
+    edited: number
     content: string
     createdAt: string
     user: { id: string; name: string; qq: number }
 }
 
-const reachedTop = ref(false)
-const loadingTop = ref(false)
-const messages = ref<Msg[]>([])
-
-async function getMsgs(online: boolean, offset: number = 0) {
-    const { data } = await gqClient
-        .query<{ msgs: Msg[] }>(
-            gql`
-                query ($room_id: String!, $limit: Int, $offset: Int) {
-                    msgs(room_id: $room_id, limit: $limit, offset: $offset) {
-                        id
-                        content
-                        createdAt
-                        room_id
-                        user {
-                            id
-                            name
-                            qq
-                        }
-                    }
-                }
-            `,
-            { room_id: props.roomId, limit: 10, offset },
-            { requestPolicy: online ? "network-only" : "cache-only" }
-        )
-        .toPromise()
-    return data?.msgs
-}
-
-async function loadHistory() {
-    messages.value = []
-    const roomId = props.roomId
-    const msgsCache = await getMsgs(false)
-    if (msgsCache) {
-        reachedTop.value = false
-        messages.value = msgsCache
-
-        nextTick(() => {
-            el.value?.scrollTo({
-                top: el.value.scrollHeight,
-                left: 0,
-                // behavior: "smooth",
-            })
-        })
-    }
-    const msgs = await getMsgs(true)
-    if (msgs && roomId === props.roomId) {
-        reachedTop.value = false
-        messages.value = msgs
-
-        nextTick(() => {
-            el.value?.scrollTo({
-                top: el.value.scrollHeight,
-                left: 0,
-                // behavior: "smooth",
-            })
-        })
-    }
-}
-
-onMounted(loadHistory)
-
-watch(() => props.roomId, loadHistory)
-
-useSubscription<{ newMessage: Msg }, Msg[]>(
+useSubscription<{ newMessage: Msg; msgEdited: Msg }, Msg[]>(
     {
         query: gql`
-            subscription ($room_id: String!) {
-                newMessage(room_id: $room_id) {
+            subscription RoomEvents($roomId: String!) {
+                newMessage(roomId: $roomId) {
                     id
                     edited
                     content
+                    createdAt
                     user {
                         id
                         name
@@ -100,17 +58,27 @@ useSubscription<{ newMessage: Msg }, Msg[]>(
                 }
             }
         `,
-        variables: { room_id: roomId },
+        variables: { roomId },
     },
     (_, data) => {
-        addMessage(data.newMessage)
+        if (data.newMessage) {
+            addMessage(data.newMessage)
+        }
         return []
     }
 )
 
 const { executeMutation: sendMessageMut } = useMutation(gql`
-    mutation ($content: String!, $room_id: String!) {
-        sendMessage(content: $content, room_id: $room_id) {
+    mutation ($content: String!, $roomId: String!) {
+        sendMessage(content: $content, roomId: $roomId) {
+            id
+        }
+    }
+`)
+
+const { executeMutation: editMessageMut } = useMutation(gql`
+    mutation ($content: String!, $msgId: String!) {
+        editMessage(content: $content, msgId: $msgId) {
             id
         }
     }
@@ -119,40 +87,13 @@ const { executeMutation: sendMessageMut } = useMutation(gql`
 const time = useTimestamp({ interval: 1000, offset: 0 })
 const nowSeconds = computed(() => ~~(time.value / 1000))
 
-useInfiniteScroll(
-    el,
-    async () => {
-        if (messages.value.length < 10 || (arrivedState.top && arrivedState.bottom) || loadingTop.value) return
-        // load more
-        const oriH = el.value!.scrollHeight
-        if (reachedTop.value) return
-        loadingTop.value = true
-        const msgs = await getMsgs(true, messages.value.length)
-        loadingTop.value = false
-        if (!msgs || msgs.length === 0) {
-            reachedTop.value = true
-            return
-        }
-        messages.value.unshift(...msgs)
-        nextTick(() => {
-            el.value!.scrollTop = el.value!.scrollHeight - oriH
-        })
-    },
-    { distance: 20, direction: "top" }
-)
-
-function addMessage(msg: Msg) {
-    messages.value.push(msg)
+async function addMessage(msg: Msg) {
     if (arrivedState.bottom) {
-        if (messages.value.length > 50) {
-            messages.value = messages.value.slice(-50)
-        }
-        nextTick(() => {
-            el.value?.scrollTo({
-                top: el.value.scrollHeight,
-                left: 0,
-                behavior: "smooth",
-            })
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        el.value?.scrollTo({
+            top: el.value.scrollHeight,
+            left: 0,
+            behavior: "smooth",
         })
     }
 }
@@ -171,7 +112,44 @@ async function sendMessage(e: Event) {
     if (!content) return
     input.value!.innerHTML = ""
     input.value!.focus()
-    await sendMessageMut({ content, room_id: props.roomId })
+    await sendMessageMut({ content, roomId: roomId.value })
+    el.value?.scrollTo({
+        top: el.value.scrollHeight,
+        left: 0,
+        behavior: "smooth",
+    })
+}
+
+const editId = ref("")
+const editInput = ref<HTMLDivElement[] | null>(null)
+async function editMessage(msgId: string, content: string) {
+    await editMessageMut({ content, msgId })
+}
+const retractCache = new WeakMap()
+async function retractMessage(msg: Msg) {
+    retractCache.set(msg, msg.content)
+    await editMessage(msg.id, "")
+    msg.content = ""
+}
+async function restoreMessage(msg: Msg) {
+    const content = retractCache.get(msg)
+    msg.content = content || msg.content
+    startEdit(msg)
+}
+async function startEdit(msg: Msg) {
+    editId.value = msg.id
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    if (editInput.value?.[0]) {
+        let el = editInput.value[0]
+        el.focus()
+        el.onblur = async () => {
+            const newVal = sanitizeHTML(el.innerHTML || "")
+            await editMessage(editId.value, newVal)
+            msg.content = newVal
+            msg.edited = 1
+            editId.value = ""
+        }
+    }
 }
 
 const imgLoading = ref(false)
@@ -243,28 +221,65 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
     <div class="w-full h-full bg-base-200/50 flex">
         <!-- 聊天窗口 -->
         <div class="flex-1 flex flex-col overflow-hidden">
-            <ScrollArea class="flex-1 overflow-hidden" @loadref="(r) => (el = r)">
-                <div class="flex w-full h-full flex-col gap-2 p-4">
-                    <div v-if="loadingTop" class="flex justify-center items-center">
-                        <span class="loading loading-spinner loading-md"></span>
+            <GQAutoPage
+                @loadref="(r) => (el = r)"
+                direction="top"
+                class="flex-1 overflow-hidden"
+                innerClass="flex w-full h-full flex-col gap-2 p-4"
+                :size="10"
+                :query="Query"
+                :variables="variables"
+                dataKey="msgs"
+                v-slot="{ data }"
+            >
+                <!-- 消息列表 -->
+                <ContextMenu v-if="data" class="group flex items-start gap-2" v-for="item in data.msgs" :key="item.id">
+                    <div v-if="!item.content && editId !== item.id" class="text-xs text-base-content/60 m-auto">
+                        {{ $t("chat.retractedAMessage", { name: setting.userId === item.user.id ? $t("chat.you") : item.user?.name }) }}
+                        <span class="text-xs text-primary underline cursor-pointer" @click="restoreMessage(item)">{{ $t("chat.restore") }}</span>
                     </div>
-                    <div class="flex justify-center items-center text-xs" v-if="reachedTop">{{ $t("chat.reachedTop") }}</div>
-                    <!-- 消息列表 -->
-                    <div class="group flex items-start gap-2" v-for="item in messages" :key="item.id">
+                    <div class="flex-1 flex items-start gap-2" :class="{ 'flex-row-reverse': setting.userId === item.user.id }" v-else>
                         <QQAvatar class="mt-2" :qq="item.user.qq" :name="item.user?.name"></QQAvatar>
-                        <div class="flex flex-col">
+                        <div class="flex items-start flex-col" :class="{ 'items-end': setting.userId === item.user.id }">
                             <div class="text-base-content/60 text-sm">{{ item.user.name }}</div>
                             <div
+                                v-if="editId === item.id"
+                                ref="editInput"
+                                contenteditable
                                 class="safe-html rounded-lg bg-base-100 select-text inline-flex flex-col text-sm max-w-80 overflow-hidden gap-2"
-                                :class="{ 'p-2': !isImage(item.content) }"
+                                :class="{ 'p-2': !isImage(item.content), 'bg-primary text-base-100': setting.userId === item.user.id }"
+                                v-html="sanitizeHTML(item.content)"
+                            ></div>
+                            <div
+                                v-else
+                                class="safe-html rounded-lg bg-base-100 select-text inline-flex flex-col text-sm max-w-80 overflow-hidden gap-2"
+                                :class="{ 'p-2': !isImage(item.content), 'bg-primary text-base-100': setting.userId === item.user.id }"
                                 v-html="sanitizeHTML(item.content)"
                             ></div>
                         </div>
+                        <div class="text-xs text-base-content/60 self-end" v-if="item.edited">{{ $t("chat.edited") }}</div>
                         <div class="flex-1"></div>
                         <div class="hidden group-hover:block p-1 text-xs text-base-content/60">{{ item.createdAt }}</div>
                     </div>
-                </div>
-            </ScrollArea>
+
+                    <template #menu>
+                        <ContextMenuItem
+                            @click="retractMessage(item)"
+                            class="group text-sm p-2 leading-none text-base-content rounded flex items-center relative select-none outline-none data-[disabled]:text-base-content/60 data-[disabled]:pointer-events-none data-[highlighted]:bg-primary data-[highlighted]:text-base-100"
+                        >
+                            <Icon class="size-4 mr-2" icon="la:reply-solid" />
+                            {{ $t("chat.revert") }}
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                            @click="startEdit(item)"
+                            class="group text-sm p-2 leading-none text-base-content rounded flex items-center relative select-none outline-none data-[disabled]:text-base-content/60 data-[disabled]:pointer-events-none data-[highlighted]:bg-primary data-[highlighted]:text-base-100"
+                        >
+                            <Icon class="size-4 mr-2" icon="la:edit-solid" />
+                            {{ $t("chat.edit") }}
+                        </ContextMenuItem>
+                    </template>
+                </ContextMenu>
+            </GQAutoPage>
             <div class="flex-none w-full relative">
                 <div class="w-full absolute -mt-[3px] h-[6px] cursor-ns-resize z-100" v-h-resize-for="{ el: inputForm, min: 120, max: 400 }"></div>
             </div>
@@ -296,9 +311,9 @@ const vHResizeFor: FunctionDirective = (el, { value: { el: target, min, max } })
             </form>
         </div>
         <!-- 成员列表 -->
-        <!-- <div class="w-44 h-full flex-none flex flex-col overflow-hidden bg-base-100/20 border-l-[1px] border-base-300/50">
+        <div class="w-44 h-full flex-none flex flex-col overflow-hidden bg-base-100/20 border-l-[1px] border-base-300/50 max-lg:hidden">
             <div class="p-2 text-sm">成员列表</div>
-        </div> -->
+        </div>
     </div>
 </template>
 <style lang="less">

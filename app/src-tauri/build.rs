@@ -9,6 +9,7 @@ fn main() {
             "get_uid",
             "set_regsk",
             "get_game",
+            "launch_game",
         ]),
     );
     tauri_build::try_build(attr).expect("failed to run build script");

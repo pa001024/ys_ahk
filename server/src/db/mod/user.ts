@@ -75,7 +75,7 @@ export const resolvers = {
             if (user) {
                 const token = jwt.sign({ id: user.id, name, qq }, jwtToken)
                 const hash = await Bun.password.hash(password)
-                await db.insert(schema.passwords).values({ hash, user_id: user.id }).onConflictDoUpdate({ target: schema.passwords.id, set: { hash } })
+                await db.insert(schema.passwords).values({ hash, userId: user.id }).onConflictDoUpdate({ target: schema.passwords.id, set: { hash } })
                 return { success: true, message: "User created successfully", token, user }
             }
             return { success: false, message: "User already exists" }
@@ -105,7 +105,7 @@ export const resolvers = {
                     const token = jwt.sign({ id: user.id, name: user.name, qq: user.qq }, jwtToken)
                     await db
                         .insert(schema.logins)
-                        .values({ user_id: user.id, ip: context.request.headers.get("x-real-ip"), ua: context.request.headers.get("user-agent") })
+                        .values({ userId: user.id, ip: context.request.headers.get("x-real-ip"), ua: context.request.headers.get("user-agent") })
                         .onConflictDoNothing()
                     return {
                         success: true,
@@ -129,13 +129,13 @@ export const resolvers = {
             if (!context.user || context.user.id.startsWith("g@")) return { success: false, message: "Unauthorized" }
             const user = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, context.user.id))
             if (user[0]) {
-                const old_pw = await db.select({ hash: schema.passwords.hash }).from(schema.passwords).where(eq(schema.passwords.user_id, context.user.id))
+                const old_pw = await db.select({ hash: schema.passwords.hash }).from(schema.passwords).where(eq(schema.passwords.userId, context.user.id))
 
                 if (!old_pw || !old_pw[0] || !old_pw[0].hash) return { success: false, message: "User not found" }
                 const isMatch = await Bun.password.verify(old_password, old_pw[0].hash)
                 if (!isMatch) return { success: false, message: "Incorrect password" }
                 const hash = await Bun.password.hash(new_password)
-                await db.update(schema.passwords).set({ hash }).where(eq(schema.passwords.user_id, context.user.id))
+                await db.update(schema.passwords).set({ hash }).where(eq(schema.passwords.userId, context.user.id))
                 return { success: true, message: "Password updated successfully" }
             }
             return { success: false, message: "User not found" }

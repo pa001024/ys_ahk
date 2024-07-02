@@ -22,7 +22,7 @@ provideClient(gqClient)
             <transition name="slide-right">
                 <KeepAlive v-if="route.meta.keepAlive">
                     <Suspense>
-                        <component :is="Component" :key="route.path" />
+                        <component :is="Component" />
                         <template #fallback>
                             <div class="w-full h-full flex justify-center items-center">
                                 <span class="loading loading-spinner loading-md"></span>
@@ -41,12 +41,10 @@ provideClient(gqClient)
 
 <style>
 .slide-right-enter-active {
-    transition: all 0.3s ease-out;
-    position: absolute;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .slide-right-leave-active {
     transition: all 0.2s cubic-bezier(0.6, -0.28, 0.73, 0.04);
-    position: absolute;
 }
 
 .slide-right-enter-from {

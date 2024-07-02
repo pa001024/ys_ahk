@@ -25,7 +25,7 @@ watch(data, (newVal) => {
     if (newVal) {
         emit("load")
     }
-    if (props.dataKey && newVal?.[props.dataKey]?.length === 0) {
+    if (props.dataKey && newVal?.[props.dataKey]?.length < (props.limit ?? 1)) {
         emit("end")
     }
 })

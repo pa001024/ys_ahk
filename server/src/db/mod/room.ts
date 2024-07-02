@@ -19,8 +19,8 @@ export const typeDefs = /* GraphQL */ `
         id: String!
         name: String!
         type: String
-        owner_id: String!
-        max_users: Int
+        ownerId: String!
+        maxUsers: Int
         createdAt: String
         updateAt: String
 
@@ -31,13 +31,13 @@ export const typeDefs = /* GraphQL */ `
     type RoomFilter {
         name: String
         type: String
-        owner_id: String
+        ownerId: String
     }
 
     input RoomsCreateInput {
         name: String!
         type: String
-        max_users: Int
+        maxUsers: Int
     }
 
     type RoomsCreateResult {
@@ -75,7 +75,7 @@ export const resolvers = {
         },
     },
     Mutation: {
-        createRoom: async (parent, { data: { name, type, max_users } }, context, info: any) => {
+        createRoom: async (parent, { data: { name, type, maxUsers } }, context, info: any) => {
             const user = context.user
             if (!user) return null
             const rst = (
@@ -84,8 +84,8 @@ export const resolvers = {
                     .values({
                         name,
                         type,
-                        max_users,
-                        owner_id: user.id,
+                        maxUsers,
+                        ownerId: user.id,
                     })
                     .onConflictDoNothing()
                     .returning()
@@ -105,7 +105,7 @@ export const resolvers = {
                 where: eq(schema.rooms.id, id),
                 with: { owner: true },
             })
-            if (room && room.owner_id === user.id) {
+            if (room && room.ownerId === user.id) {
                 await db.delete(schema.rooms).where(eq(schema.rooms.id, id)).execute()
                 return true
             }

@@ -52,6 +52,7 @@
         "game:allow-get-regsk",
         "game:allow-get-uid",
         "game:allow-set-regsk",
+        "game:allow-launch-game",
         "game:allow-get-game"
     ]
 }

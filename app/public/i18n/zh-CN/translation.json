@@ -43,7 +43,13 @@
     "search": "搜索房间",
     "roomType": "房间类型",
     "normal": "普通",
-    "legend": "传奇"
+    "legend": "传奇",
+    "you": "你",
+    "revert": "撤回",
+    "edit": "编辑",
+    "edited": "(已编辑)",
+    "restore": "重新编辑",
+    "retractedAMessage": "{{name}}撤回了一条消息"
   },
   "user": {
     "title": "用户"

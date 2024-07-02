@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{ffi::c_void, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -7,8 +7,51 @@ use tauri::{
 };
 use winreg::{enums::*, RegKey, RegValue};
 
-use self::util::{get_procees_by_name, kill_process};
+use self::util::*;
 mod util;
+
+#[tauri::command]
+pub fn launch_game(path: &str, cmds: &str, unlock: bool) -> bool {
+    let pid = get_procees_by_name("YuanShen.exe").unwrap_or(0);
+    if pid > 0 {
+        return false;
+    }
+    let pi = shell_execute(path, Some(cmds), None);
+    if let Err(err) = pi {
+        println!("Failed to launch game: {:?}", err);
+        return false;
+    }
+    if unlock {
+        let pi = pi.unwrap();
+        let h_unity_player = get_module_by_name(pi.hProcess, "UnityPlayer.dll");
+        if let Err(err) = h_unity_player {
+            println!("Failed to get UnityPlayer.dll: {:?}", err);
+            return false;
+        }
+        let h_unity_player = h_unity_player.unwrap();
+
+        let pfps = get_memory_by_pattern(
+            pi.hProcess,
+            h_unity_player.modBaseAddr as *const c_void,
+            h_unity_player.modBaseSize as usize,
+            "7F 0E E8 ?? ?? ?? ?? 66 0F 6E C8",
+            h_unity_player.modBaseAddr as usize,
+        );
+
+        if let Err(err) = pfps {
+            println!("Failed to get FPS Offset: {:?}", err);
+            return false;
+        }
+        let pfps = pfps.unwrap();
+        println!("FPS Offset: {:?}", pfps);
+
+        write_memory_until_exit(pi.hProcess, pfps, 140);
+    } else {
+        return true;
+    }
+
+    false
+}
 
 #[tauri::command]
 async fn kill_game() -> bool {
@@ -126,14 +169,19 @@ async fn get_game(is_run: bool) -> bool {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("game")
         .invoke_handler(tauri::generate_handler![
-            get_regsk, get_uid, set_regsk, get_game, kill_game,
+            get_regsk,
+            get_uid,
+            set_regsk,
+            get_game,
+            kill_game,
+            launch_game
         ])
         .build()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{get_procees_by_name, get_regsk, get_uid};
+    use super::{get_procees_by_name, get_regsk, get_uid, launch_game};
 
     #[test]
     fn test_get_procees() {
@@ -150,6 +198,15 @@ mod tests {
     #[test]
     fn test_get_uid() {
         let rst = get_uid();
+        println!("rst: {}", rst);
+    }
+    #[test]
+    fn test_launch_game() {
+        let rst = launch_game(
+            "D:\\usr\\Games\\Genshin Impact\\Genshin Impact Game\\YuanShen.exe",
+            "--",
+            true,
+        );
         println!("rst: {}", rst);
     }
 }

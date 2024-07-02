@@ -19,6 +19,16 @@ export const useSettingStore = defineStore("setting", {
             yunlianPhone: useLocalStorage("setting_yunlian_phone", ""),
         }
     },
+    getters: {
+        userId(state) {
+            if (state.token) {
+                const token = state.token.split(".")[1]
+                const payload = JSON.parse(atob(token))
+                return payload.id
+            }
+            return ""
+        },
+    },
     actions: {
         setTheme(theme: string) {
             this.theme = theme

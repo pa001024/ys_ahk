@@ -6373,6 +6373,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "thiserror",
  "tokio",
+ "widestring",
  "window-shadows",
  "window-vibrancy",
  "windows 0.57.0",

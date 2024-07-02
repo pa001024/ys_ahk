@@ -7,6 +7,7 @@ SetKeyDelay 30, 25 ; SendPlay模式延迟
 SetWorkingDir A_ScriptDir ; 设置工作目录
 SetTitleMatchMode 3
 SetCapsLockState 0
+SetWinDelay 20
 
 #Include basic.ahk
 #Include yuanshen_c.ahk
@@ -36,4 +37,31 @@ WatchClipboard(data) {
   }
 }
 
+#HotIf
+Launch_Media:: {
+  ControlClick "x64 y51", "原神"
+}
+
 F12:: ExitApp
+
+
+; Alt+中键移动窗口
+!MButton::
+{
+  CoordMode "Mouse"
+  MouseGetPos &oriX, &oriY, &hwnd
+  WinGetPos &winX, &winY, , , hwnd
+  Loop
+  {
+    if !GetKeyState("MButton", "P")
+      break
+    MouseGetPos &x, &y
+    offsetX := x - oriX
+    offsetY := y - oriY
+    toX := (winX + offsetX)
+    toY := (winY + offsetY)
+    WinMove toX, toY, , , hwnd
+  }
+  ToolTip
+  CoordMode "Mouse", "Client"
+}

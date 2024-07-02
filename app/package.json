@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "tb": "tauri build",
     "gen": "bun src/gen.ts"
   },
   "dependencies": {

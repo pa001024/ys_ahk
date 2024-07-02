@@ -54,6 +54,22 @@ const cacheExchange = offlineExchange({
                     ],
                 })
             },
+            msgEdited(result: any, args, cache, _info) {
+                const fragment = gql`
+                    fragment _ on Msg {
+                        id
+                        content
+                        edited
+                    }
+                `
+
+                const msg = result.msgEdited
+                cache.writeFragment(fragment, {
+                    id: msg.id,
+                    content: msg.content,
+                    edited: msg.edited,
+                })
+            },
         },
     },
     optimistic: {},

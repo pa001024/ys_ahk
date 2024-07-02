@@ -6,6 +6,7 @@ import { onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
 import { useSettingStore } from "../mod/state/setting"
 import Tooltip from "./Tooltip.vue"
 import Icon from "./Icon.vue"
+import { env } from "../env"
 
 const props = defineProps({
     title: { type: String },
@@ -19,11 +20,15 @@ const props = defineProps({
     draggable: { type: Boolean, default: true },
 })
 
-const appWindow = window.getCurrent()
+let appWindow: ReturnType<typeof window.getCurrent>
 
-watchEffect(() => {
-    appWindow.setResizable(props.resizable)
-})
+if (env.isApp) {
+    appWindow = window.getCurrent()
+
+    watchEffect(() => {
+        appWindow.setResizable(props.resizable)
+    })
+}
 
 const setting = useSettingStore()
 const alwaysOnTop = ref(false)
@@ -53,20 +58,22 @@ function handleClose() {
 }
 
 watch(alwaysOnTop, async (newValue) => {
-    await appWindow.setAlwaysOnTop(!alwaysOnTop.value)
+    await appWindow.setAlwaysOnTop(newValue)
 })
 
 let unlisten: Function
 
-onMounted(async () => {
-    unlisten = await appWindow.listen("tauri://resize", async () => {
-        maximized.value = await appWindow.isMaximized()
+if (env.isApp) {
+    onMounted(async () => {
+        unlisten = await appWindow.listen("tauri://resize", async () => {
+            maximized.value = await appWindow.isMaximized()
+        })
     })
-})
 
-onUnmounted(() => {
-    unlisten?.()
-})
+    onUnmounted(() => {
+        unlisten?.()
+    })
+}
 </script>
 <template>
     <!-- Root -->
@@ -80,12 +87,12 @@ onUnmounted(() => {
             <div class="relative w-full h-10 pb-1 mt-1 flex items-center space-x-1 sm:space-x-2 pl-2 pr-1">
                 <div :data-tauri-drag-region="draggable" className="pointer-events-none w-full h-full font-semibold text-2xl flex items-center space-x-2">
                     <img :src="icon" class="w-6 h-6" />
-                    <span className="hidden sm:block text-sm">
+                    <span className="max-[370px]:hidden text-sm">
                         {{ title }}
                     </span>
                 </div>
-                <!-- fix resize -->
-                <div class="pointer-events-none flex-none opacity-0 self-start transition-none">
+                <!-- fix resize shadow -->
+                <div class="pointer-events-none flex-none opacity-0 self-start transition-none" v-if="env.isApp">
                     <div class="flex items-center space-x-2">
                         <label class="btn btn-ghost btn-sm btn-square swap swap-rotate" v-if="darkable">
                             <!-- this hidden checkbox controls the state -->
@@ -112,7 +119,7 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <!-- fix resize -->
-                <div class="pointer-events-none fixed right-1 top-1">
+                <div class="pointer-events-none fixed right-1 top-1" v-if="env.isApp">
                     <div class="flex pointer-events-auto items-center space-x-2">
                         <label class="btn btn-ghost btn-sm btn-square swap swap-rotate" v-if="darkable">
                             <!-- this hidden checkbox controls the state -->
@@ -152,9 +159,9 @@ onUnmounted(() => {
                 </div>
             </div>
             <!-- Body -->
-            <ScrollArea :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-hidden">
+            <div :class="{ 'rounded-tl-box': !!$slots.sidebar }" class="w-full relative bg-base-200/50 flex-1 overflow-hidden">
                 <slot></slot>
-            </ScrollArea>
+            </div>
         </div>
     </div>
 </template>

@@ -15,7 +15,9 @@
     "@elysiajs/static": "^1.0.3",
     "@elysiajs/stream": "^1.0.2",
     "@envelop/graphql-jit": "^8.0.3",
+    "@graphql-yoga/node": "^3.9.1",
     "@graphql-yoga/plugin-sofa": "^3.4.0",
+    "@prisma/client": "5.16.1",
     "@vitejs/plugin-vue": "^5.0.5",
     "@vue/apollo-composable": "^4.0.2",
     "bcrypt": "^5.1.1",
@@ -31,6 +33,7 @@
     "mitt": "^3.0.1",
     "nanoid": "^5.0.7",
     "node-machine-id": "^1.1.12",
+    "prisma": "^5.16.1",
     "rxjs": "^7.8.1",
     "vite": "^5.3.1",
     "vue": "^3.4.30"
@@ -41,5 +44,9 @@
     "bun-types": "latest",
     "drizzle-kit": "^0.22.7"
   },
-  "module": "src/index.js"
+  "module": "src/index.js",
+  "type": "module",
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
 }

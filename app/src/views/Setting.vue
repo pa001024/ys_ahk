@@ -43,7 +43,7 @@ const darkThemes = [
 ]
 
 const { data, executeQuery: reloadMe } = useQuery({
-    query: /* GraphQL */ gql`
+    query: gql`
         {
             me {
                 id
@@ -53,6 +53,7 @@ const { data, executeQuery: reloadMe } = useQuery({
             }
         }
     `,
+    requestPolicy: "cache-and-network",
 })
 
 const { executeMutation: loginMutation } = useMutation(gql`

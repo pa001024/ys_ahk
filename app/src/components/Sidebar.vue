@@ -6,42 +6,41 @@ import SidebarButton from "./SidebarButton.vue"
 import { useState } from "../mod/state"
 import { useUIStore } from "../mod/state/ui"
 import type { IconTypes } from "../components/Icon.vue"
+import { env } from "../env"
 
 const { t } = useTranslation()
 const target = ref<HTMLDivElement | null>(null)
 
-const tabs: { name: string; path: string; icon: IconTypes }[] = [
-    {
-        name: "home",
-        path: "/",
-        icon: "la:bookmark",
-    },
-    {
-        name: "game",
-        path: "/game",
-        icon: "la:gamepad-solid",
-    },
-    {
-        name: "chat",
-        path: "/chat",
-        icon: "la:comment-alt",
-    },
-    {
-        name: "room",
-        path: "/room",
-        icon: "la:broadcast-tower-solid",
-    },
-    // {
-    //     name: "map",
-    //     path: "/map",
-    //     icon: LiaMap,
-    // },
-    {
-        name: "user",
-        path: "/user",
-        icon: "la:user",
-    },
-]
+const tabs = (
+    [
+        {
+            name: "home",
+            path: "/",
+            icon: "la:bookmark",
+        },
+        {
+            name: "game",
+            path: "/game",
+            icon: "la:gamepad-solid",
+            if: env.isApp,
+        },
+        {
+            name: "chat",
+            path: "/chat",
+            icon: "la:comment-alt",
+        },
+        // {
+        //     name: "map",
+        //     path: "/map",
+        //     icon: LiaMap,
+        // },
+        {
+            name: "user",
+            path: "/user",
+            icon: "la:user",
+        },
+    ] satisfies { name: string; path: string; icon: IconTypes; if?: boolean }[]
+).filter((tab) => tab.if !== false)
 const UI = useUIStore()
 const [expand, setExpand] = useState(UI, "sidebarExpand")
 watchEffect(() => {
